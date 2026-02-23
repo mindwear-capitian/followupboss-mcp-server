@@ -1,7 +1,7 @@
 {
   "name": "followupboss-mcp-server",
-  "version": "1.0.0",
-  "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM - 152 tools covering 100% of the official API",
+  "version": "1.1.0",
+  "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM - 157 tools covering 100% of the official API",
   "type": "module",
   "main": "index.js",
   "scripts": {
