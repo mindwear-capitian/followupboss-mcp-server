@@ -1,0 +1,37 @@
+{
+  "name": "followupboss-mcp-server",
+  "version": "1.0.0",
+  "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM - 152 tools covering 100% of the official API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "setup": "node setup.js"
+  },
+  "keywords": [
+    "mcp",
+    "follow-up-boss",
+    "fub",
+    "crm",
+    "real-estate",
+    "claude",
+    "ai",
+    "model-context-protocol"
+  ],
+  "author": "Ed Neuhaus <ed@neuhausre.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mindwear-capitian/followupboss-mcp-server"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bin": {
+    "followupboss-mcp-server": "./index.js"
+  }
+}
