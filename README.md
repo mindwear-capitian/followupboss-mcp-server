@@ -71,8 +71,21 @@ npm run setup
 This will:
 - Ask for your API key
 - Test the connection to make sure it works
-- Save your key securely in a local `.env` file
+- **Ask you to choose Safe Mode or Full Access**
+- Save your settings in a local `.env` file
 - Show you exactly how to connect it to Claude
+
+#### Safe Mode vs Full Access
+
+| | Safe Mode (default) | Full Access |
+|---|---|---|
+| Read data (contacts, deals, etc.) | Yes | Yes |
+| Create new records | Yes | Yes |
+| Update existing records | Yes | Yes |
+| **Delete records** | **No** | Yes |
+| Tools available | 129 | 152 |
+
+**Safe Mode is the default** and recommended for most users. It gives you everything except the ability to delete data. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
 
 ### Step 4: Connect to Your AI Tool
 

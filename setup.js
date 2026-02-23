@@ -86,6 +86,27 @@ async function main() {
     process.exit(1);
   }
 
+  // Safe mode question
+  console.log('Choose an installation mode:');
+  console.log('');
+  console.log('  1. Safe Mode (recommended)');
+  console.log('     Read, create, and update your FUB data.');
+  console.log('     Delete tools are DISABLED. Nothing can be deleted.');
+  console.log('');
+  console.log('  2. Full Access');
+  console.log('     All 152 tools enabled, including delete operations.');
+  console.log('     Use with caution -- AI can delete contacts, deals, etc.');
+  console.log('');
+  const modeChoice = await ask('Enter 1 or 2 (default: 1): ');
+  const safeMode = modeChoice !== '2';
+
+  if (safeMode) {
+    console.log('\n  Safe Mode enabled. Delete tools will be disabled.');
+  } else {
+    console.log('\n  Full Access enabled. All tools including delete are active.');
+  }
+  console.log('');
+
   // Write .env file
   const envPath = resolve(__dirname, '.env');
   const envExists = existsSync(envPath);
@@ -95,25 +116,30 @@ async function main() {
     if (overwrite.toLowerCase() !== 'y') {
       console.log('\nSetup complete (kept existing .env file).');
       rl.close();
-      printNextSteps();
+      printNextSteps(safeMode);
       return;
     }
   }
 
-  writeFileSync(envPath, `# Follow Up Boss API Key\nFUB_API_KEY=${apiKey}\n`);
-  console.log('Saved API key to .env file.');
+  writeFileSync(envPath, `# Follow Up Boss API Key\nFUB_API_KEY=${apiKey}\n\n# Safe Mode: disable all delete tools (true/false)\nFUB_SAFE_MODE=${safeMode}\n`);
+  console.log('Saved settings to .env file.');
 
   rl.close();
-  printNextSteps();
+  printNextSteps(safeMode);
 }
 
-function printNextSteps() {
+function printNextSteps(safeMode) {
   const fullPath = resolve(__dirname);
+
+  const envBlock = { FUB_API_KEY: "your_api_key_here" };
+  if (safeMode) envBlock.FUB_SAFE_MODE = "true";
 
   console.log('');
   console.log('===========================================');
   console.log('  Next Steps: Connect to Claude');
   console.log('===========================================');
+  console.log('');
+  console.log(`Mode: ${safeMode ? 'SAFE MODE (delete tools disabled)' : 'FULL ACCESS (all tools enabled)'}`);
   console.log('');
   console.log('OPTION 1: Claude Desktop');
   console.log('');
@@ -127,9 +153,7 @@ function printNextSteps() {
       "followupboss": {
         command: "node",
         args: [`${fullPath}/index.js`],
-        env: {
-          FUB_API_KEY: "your_api_key_here"
-        }
+        env: envBlock
       }
     }
   }, null, 2));
