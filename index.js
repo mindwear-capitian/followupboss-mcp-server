@@ -3,7 +3,7 @@
 /**
  * Follow Up Boss MCP Server
  *
- * A Model Context Protocol server that provides 152 tools
+ * A Model Context Protocol server that provides 157 tools
  * for interacting with the Follow Up Boss CRM API.
  *
  * https://github.com/mindwear-capitian/followupboss-mcp-server
@@ -39,6 +39,27 @@ const fubApi = axios.create({
 });
 
 // ---------------------------------------------------------------------------
+// Retry logic for rate limiting (429)
+// ---------------------------------------------------------------------------
+
+async function fubApiWithRetry(method, ...methodArgs) {
+  const maxRetries = 3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fubApi[method](...methodArgs);
+    } catch (error) {
+      if (error.response?.status === 429 && attempt < maxRetries) {
+        const retryAfter = parseInt(error.response.headers['retry-after'] || '2', 10);
+        const wait = Math.min(retryAfter * 1000, 10000) * (attempt + 1);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Error handling
 // ---------------------------------------------------------------------------
 
@@ -54,7 +75,7 @@ function handleApiError(error) {
 }
 
 // ---------------------------------------------------------------------------
-// Tool Definitions (153 tools)
+// Tool Definitions (157 tools — 152 core + 5 convenience)
 // ---------------------------------------------------------------------------
 
 const TOOL_DEFINITIONS = [
@@ -116,7 +137,7 @@ const TOOL_DEFINITIONS = [
 // ==================== PEOPLE ====================
 {
   "name": "listPeople",
-  "description": "List/search people in FUB with extensive filtering options",
+  "description": "List/search people in FUB. Supports filtering by name, email, phone, tags, stage, source, assignedTo, price range, smart list, and more. For tag filtering use the tags parameter (comma-separated, OR logic). For email lookup use the email parameter.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1962,6 +1983,70 @@ const TOOL_DEFINITIONS = [
   }
 }
 
+,
+
+// ==================== CONVENIENCE TOOLS ====================
+{
+  "name": "removeTagFromPerson",
+  "description": "Remove a single tag from a person without affecting their other tags. Handles the read-modify-write cycle internally.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "number", "description": "Person ID" },
+      "tag": { "type": "string", "description": "Tag to remove (case-insensitive match)" }
+    },
+    "required": ["id", "tag"]
+  }
+},
+{
+  "name": "getPersonByEmail",
+  "description": "Look up a person by email address. Returns the first matching contact.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "email": { "type": "string", "description": "Email address to look up" }
+    },
+    "required": ["email"]
+  }
+},
+{
+  "name": "searchPeopleByTag",
+  "description": "Find all people with one or more tags. Comma-separate multiple tags for OR matching (e.g. 'Investor,Buyer' returns people with either tag).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "tags": { "type": "string", "description": "Comma-separated tag(s) to search for" },
+      "limit": { "type": "number", "description": "Max results (default 25, max 100)" },
+      "offset": { "type": "number", "description": "Offset for pagination" }
+    },
+    "required": ["tags"]
+  }
+},
+{
+  "name": "bulkUpdatePeople",
+  "description": "Update multiple people with the same changes. Rate-limited to stay within FUB's 25 PUTs per 10 seconds. Returns results for each person.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "ids": { "type": "array", "items": { "type": "number" }, "description": "Array of person IDs to update" },
+      "mergeTags": { "type": "boolean", "description": "Merge tags instead of replacing" },
+      "updates": { "type": "object", "description": "Fields to update on each person (same fields as updatePerson: tags, stage, assignedTo, etc.)" }
+    },
+    "required": ["ids", "updates"]
+  }
+},
+{
+  "name": "listAvailableTags",
+  "description": "Discover tags used in your FUB account by scanning recent contacts. Returns unique tags sorted alphabetically. Note: scans up to 500 contacts so may not find rarely-used tags.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Number of contacts to scan (default 500, max 500)" }
+    },
+    "required": []
+  }
+}
+
 ]; // end TOOL_DEFINITIONS
 
 // ---------------------------------------------------------------------------
@@ -2676,6 +2761,69 @@ async function handleToolCall(name, args) {
     case 'getThreadedReplies': {
       const response = await fubApi.get(`/threadedReplies/${args.id}`);
       return response.data;
+    }
+
+    // ==================== CONVENIENCE TOOLS ====================
+    case 'removeTagFromPerson': {
+      const person = await fubApiWithRetry('get', `/people/${args.id}`);
+      const currentTags = person.data.tags || [];
+      const tagLower = args.tag.toLowerCase();
+      const newTags = currentTags.filter(t => t.toLowerCase() !== tagLower);
+      if (newTags.length === currentTags.length) {
+        return { success: false, message: `Tag "${args.tag}" not found on person ${args.id}`, currentTags };
+      }
+      const response = await fubApiWithRetry('put', `/people/${args.id}`, { tags: newTags });
+      return { success: true, message: `Tag "${args.tag}" removed`, removedTag: args.tag, remainingTags: newTags };
+    }
+    case 'getPersonByEmail': {
+      const response = await fubApiWithRetry('get', '/people', { params: { email: args.email, limit: 1 } });
+      const people = response.data.people || [];
+      if (people.length === 0) {
+        return { found: false, message: `No person found with email ${args.email}` };
+      }
+      return { found: true, person: people[0] };
+    }
+    case 'searchPeopleByTag': {
+      const { tags, ...params } = args;
+      const response = await fubApiWithRetry('get', '/people', { params: { tags, ...params } });
+      return { people: response.data.people, _metadata: response.data._metadata };
+    }
+    case 'bulkUpdatePeople': {
+      const { ids, updates, mergeTags } = args;
+      const results = [];
+      const batchSize = 20;
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          const params = mergeTags !== undefined ? { mergeTags } : {};
+          const response = await fubApiWithRetry('put', `/people/${ids[i]}`, updates, { params });
+          results.push({ id: ids[i], success: true });
+        } catch (error) {
+          results.push({ id: ids[i], success: false, error: error.response?.data?.errorMessage || error.message });
+        }
+        // Throttle: pause every 20 requests to stay under 25 PUTs/10sec
+        if ((i + 1) % batchSize === 0 && i + 1 < ids.length) {
+          await new Promise(r => setTimeout(r, 11000));
+        }
+      }
+      const succeeded = results.filter(r => r.success).length;
+      return { total: ids.length, succeeded, failed: ids.length - succeeded, results };
+    }
+    case 'listAvailableTags': {
+      const scanLimit = Math.min(args.limit || 500, 500);
+      const allTags = new Set();
+      let offset = 0;
+      const pageSize = 100;
+      while (offset < scanLimit) {
+        const response = await fubApiWithRetry('get', '/people', { params: { limit: pageSize, offset, fields: 'tags' } });
+        const people = response.data.people || [];
+        if (people.length === 0) break;
+        for (const person of people) {
+          if (person.tags) person.tags.forEach(t => allTags.add(t));
+        }
+        offset += pageSize;
+      }
+      const sorted = [...allTags].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+      return { count: sorted.length, tags: sorted, contactsScanned: offset };
     }
 
     default:
