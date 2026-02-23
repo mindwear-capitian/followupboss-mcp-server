@@ -72,16 +72,22 @@ This will:
 - Save your key securely in a local `.env` file
 - Show you exactly how to connect it to Claude
 
-### Step 4: Connect to Claude
+### Step 4: Connect to Your AI Tool
+
+Pick the tool you use below. Each one needs a small config file edit -- the setup wizard (`npm run setup`) will show you the exact paths and JSON for your computer, but here are the manual instructions for each.
+
+> **What's a config file?** It's a settings file that tells your AI tool where to find this server. You'll copy/paste a small block of text into it. That's it.
+
+---
 
 #### Claude Desktop
 
-Open your Claude Desktop config file:
-
-- **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
-Add this to the file (the setup wizard will show you the exact paths for your computer):
+1. Open Finder (Mac) or File Explorer (Windows)
+2. Go to this file:
+   - **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+3. If the file doesn't exist, create it
+4. Paste this (replace the two placeholder values with yours):
 
 ```json
 {
@@ -97,26 +103,194 @@ Add this to the file (the setup wizard will show you the exact paths for your co
 }
 ```
 
-Replace `/full/path/to/` with the actual path where you downloaded this project, and `your_api_key_here` with your FUB API key.
+5. Replace `/full/path/to/` with where you downloaded this project
+6. Replace `your_api_key_here` with your FUB API key
+7. **Restart Claude Desktop** (fully quit and reopen)
 
-Then **restart Claude Desktop** for the changes to take effect.
+---
 
 #### Claude Code (CLI)
 
+Run this one command in your terminal (replace the path):
+
 ```bash
-claude mcp add followupboss node /full/path/to/followupboss-mcp-server/index.js
+claude mcp add followupboss -- node /full/path/to/followupboss-mcp-server/index.js
 ```
 
-#### Other MCP Clients (Cursor, Windsurf, etc.)
+Then restart Claude Code.
 
-Use these connection details:
-- **Command:** `node`
-- **Args:** `/full/path/to/followupboss-mcp-server/index.js`
-- **Environment variable:** `FUB_API_KEY=your_api_key_here`
+---
+
+#### Cursor
+
+1. Open Cursor
+2. Go to **Settings** > **Developer** > click **"Edit Config"** (this opens `~/.cursor/mcp.json`)
+3. Paste this:
+
+```json
+{
+  "mcpServers": {
+    "followupboss": {
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+4. Replace the path and API key with yours
+5. **Restart Cursor**
+
+---
+
+#### Windsurf
+
+1. Open Windsurf
+2. Go to **Settings** > **Cascade** > **MCP Servers**
+3. Or manually edit this file:
+   - **Mac:** `~/.codeium/windsurf/mcp_config.json`
+   - **Windows:** `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
+4. Paste this:
+
+```json
+{
+  "mcpServers": {
+    "followupboss": {
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+5. Replace the path and API key with yours
+6. **Fully quit and restart Windsurf**
+
+---
+
+#### VS Code with GitHub Copilot
+
+> Requires VS Code 1.99 or newer and GitHub Copilot extension.
+
+1. Open VS Code
+2. Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows)
+3. Type **"MCP: Open User Configuration"** and select it
+4. Paste this:
+
+```json
+{
+  "servers": {
+    "followupboss": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+5. Replace the path and API key with yours
+6. Use the tools in Copilot's **Agent mode**
+
+> **Note:** VS Code uses `"servers"` and requires `"type": "stdio"` -- slightly different from the other tools.
+
+---
+
+#### Cline (VS Code Extension)
+
+1. Open VS Code with Cline installed
+2. Click the **MCP Servers** icon in the Cline sidebar
+3. Click **"Configure MCP Servers"**
+4. Paste this:
+
+```json
+{
+  "mcpServers": {
+    "followupboss": {
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+5. Replace the path and API key with yours
+
+---
+
+#### Gemini CLI (Google)
+
+> This works with Google's Gemini CLI tool, not the Gemini website.
+
+1. Edit (or create) this file:
+   - **Mac:** `~/.gemini/settings.json`
+   - **Windows:** `%USERPROFILE%\.gemini\settings.json`
+2. Paste this:
+
+```json
+{
+  "mcpServers": {
+    "followupboss": {
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+3. Replace the path and API key with yours
+
+---
+
+#### Continue.dev (VS Code Extension)
+
+1. In your project, create a folder called `.continue/mcpServers/` if it doesn't exist
+2. Create a file called `followupboss.json` inside it
+3. Paste this:
+
+```json
+{
+  "mcpServers": {
+    "followupboss": {
+      "command": "node",
+      "args": ["/full/path/to/followupboss-mcp-server/index.js"],
+      "env": {
+        "FUB_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+4. Replace the path and API key with yours
+5. Use the tools in Continue's **Agent mode**
+
+---
+
+#### ChatGPT, OpenAI API, and Grok
+
+These tools only support **remote** MCP servers (hosted on the internet), not local ones. This means the setup is more advanced -- you would need to host this server on a cloud service with HTTPS.
+
+If there's enough interest, we may add a hosted version in the future. For now, we recommend using one of the tools listed above that support local MCP servers.
 
 ## Usage Examples
 
-Once connected, just talk to Claude normally. Here are some things you can ask:
+Once connected, just talk to your AI tool normally. Here are some things you can ask:
 
 > "Show me all my leads from this week"
 
