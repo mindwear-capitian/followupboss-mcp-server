@@ -474,7 +474,7 @@ MCP (Model Context Protocol) is an open standard created by Anthropic that lets 
 
 **Who made this?**
 
-Built by [Ed Neuhaus](https://neuhausre.com) at [StaySTRA](https://staystra.com), a real estate technology company in Nashville, TN. We use Follow Up Boss every day and built this to make our own workflow faster.
+Built by [Ed Neuhaus](https://neuhausre.com) at [StaySTRA](https://staystra.com), a real estate technology company in Austin, TX. We use Follow Up Boss every day and built this to make our own workflow faster.
 
 ## Contributing
 
