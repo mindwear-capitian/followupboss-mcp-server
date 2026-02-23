@@ -2,6 +2,8 @@
 
 Connect your Follow Up Boss CRM to Claude AI (or any MCP-compatible tool) with full access to all 152 official API endpoints.
 
+> **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. Use at your own risk. We strongly recommend testing with a small number of records first, and always reviewing AI-suggested actions before confirming changes to your live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
+
 ## What This Does
 
 This server acts as a bridge between your Follow Up Boss account and AI tools like Claude. Once connected, you can talk to Claude in plain English and it will read, create, update, and manage your FUB data directly.
