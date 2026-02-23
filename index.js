@@ -26,6 +26,7 @@ if (!FUB_API_KEY) {
   process.exit(1);
 }
 
+const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
 const FUB_BASE_URL = 'https://api.followupboss.com/v1';
 
 const fubApi = axios.create({
@@ -2694,12 +2695,22 @@ const server = new Server(
   { capabilities: { tools: {} } }
 );
 
+const activeTools = FUB_SAFE_MODE
+  ? TOOL_DEFINITIONS.filter(t => !t.name.toLowerCase().startsWith('delete') && t.name !== 'inboxAppDeleteParticipant' && t.name !== 'deleteReaction')
+  : TOOL_DEFINITIONS;
+
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOL_DEFINITIONS
+  tools: activeTools
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  if (FUB_SAFE_MODE && (name.toLowerCase().startsWith('delete') || name === 'inboxAppDeleteParticipant' || name === 'deleteReaction')) {
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ error: 'This tool is disabled in Safe Mode. To enable delete operations, set FUB_SAFE_MODE=false or remove it from your config.' }, null, 2) }],
+      isError: true,
+    };
+  }
   try {
     const result = await handleToolCall(name, args || {});
     return {
@@ -2716,7 +2727,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Follow Up Boss MCP Server v1.0.0 started (${TOOL_DEFINITIONS.length} tools)`);
+  console.error(`Follow Up Boss MCP Server v1.0.0 started (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
 }
 
 main().catch(console.error);
