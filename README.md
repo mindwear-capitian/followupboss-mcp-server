@@ -1,6 +1,6 @@
 # Follow Up Boss MCP Server
 
-Connect your Follow Up Boss CRM to Claude AI (or any MCP-compatible tool) with full access to all 152 official API endpoints.
+Connect your Follow Up Boss CRM to Claude AI (or any MCP-compatible tool) with 157 tools covering all official API endpoints plus convenience tools for common workflows.
 
 > **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. Use at your own risk. We strongly recommend testing with a small number of records first, and always reviewing AI-suggested actions before confirming changes to your live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
 
@@ -83,7 +83,7 @@ This will:
 | Create new records | Yes | Yes |
 | Update existing records | Yes | Yes |
 | **Delete records** | **No** | Yes |
-| Tools available | 129 | 152 |
+| Tools available | 134 | 157 |
 
 **Safe Mode is the default** and recommended for most users. It gives you everything except the ability to delete data. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
 
@@ -327,7 +327,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 
 > "What action plans do I have set up?"
 
-## All 152 Available Tools
+## All 157 Available Tools
 
 <details>
 <summary>Click to expand full tool list</summary>
@@ -620,7 +620,27 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 |------|-------------|
 | `getThreadedReplies` | Get threaded replies for an item |
 
+### Convenience Tools
+
+| Tool | Description |
+|------|-------------|
+| `removeTagFromPerson` | Remove a single tag without affecting others (handles read-modify-write internally) |
+| `getPersonByEmail` | Look up a person by email address |
+| `searchPeopleByTag` | Find all people with specific tags (comma-separated, OR logic) |
+| `bulkUpdatePeople` | Update multiple people at once with automatic rate limiting |
+| `listAvailableTags` | Discover all tags in your account by scanning contacts |
+
 </details>
+
+## Rate Limiting
+
+The server automatically retries requests when FUB's rate limits are hit (HTTP 429). It reads the `Retry-After` header and backs off with increasing delays, up to 3 retries per request. FUB's limits are:
+
+- **Global:** 250 requests per 10 seconds
+- **People updates:** 25 per 10 seconds
+- **Notes:** 10 per 10 seconds
+
+The `bulkUpdatePeople` tool also adds a built-in pause every 20 operations to stay under the PUT limit.
 
 ## Troubleshooting
 
@@ -677,7 +697,7 @@ Contributions are welcome! Here's how:
 6. Push: `git push origin my-feature`
 7. Open a Pull Request
 
-Please keep the code style consistent and make sure all 152 tools continue to work.
+Please keep the code style consistent and make sure all 157 tools continue to work.
 
 ## License
 
