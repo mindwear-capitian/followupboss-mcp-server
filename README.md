@@ -87,6 +87,26 @@ This will:
 
 **Safe Mode is the default** and recommended for most users. It gives you everything except the ability to delete data. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
 
+### Quick Verify (Optional)
+
+Before connecting to Claude, you can verify everything works:
+
+```bash
+npm test
+```
+
+You should see:
+
+```
+  PASS  Server starts and MCP handshake succeeds
+  PASS  Lists 134 tools
+  PASS  Read-only API call works (account: ok)
+
+3 passed, 0 failed
+```
+
+If all 3 pass, you're good to go. If something fails, double-check your API key in the `.env` file.
+
 ### Step 4: Connect to Your AI Tool
 
 Pick the tool you use below. Each one needs a small config file edit -- the setup wizard (`npm run setup`) will show you the exact paths and JSON for your computer, but here are the manual instructions for each.
