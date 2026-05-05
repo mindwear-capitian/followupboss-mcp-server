@@ -2420,7 +2420,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== PEOPLE RELATIONSHIPS ====================
     case 'listRelationships': {
       const response = await fubApi.get('/peopleRelationships', { params: args });
-      return { peopleRelationships: response.data.peopleRelationships, _metadata: response.data._metadata };
+      return { peopleRelationships: response.data.peopleRelationships || response.data.peoplerelationships, _metadata: response.data._metadata };
     }
     case 'createRelationship': {
       const body = translateRelationshipArgs(args);
@@ -2528,7 +2528,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== SMART LISTS ====================
     case 'listSmartLists': {
       const response = await fubApi.get('/smartLists', { params: args });
-      return { smartLists: response.data.smartlists, _metadata: response.data._metadata };
+      return { smartLists: response.data.smartLists || response.data.smartlists, _metadata: response.data._metadata };
     }
     case 'getSmartList': {
       const response = await fubApi.get(`/smartLists/${args.id}`);
@@ -2538,11 +2538,11 @@ async function handleToolCall(name, rawArgs) {
     // ==================== ACTION PLANS ====================
     case 'listActionPlans': {
       const response = await fubApi.get('/actionPlans', { params: args });
-      return { actionPlans: response.data.actionPlans, _metadata: response.data._metadata };
+      return { actionPlans: response.data.actionPlans || response.data.actionplans, _metadata: response.data._metadata };
     }
     case 'listActionPlansPeople': {
       const response = await fubApi.get('/actionPlansPeople', { params: args });
-      return { actionPlansPeople: response.data.actionPlansPeople, _metadata: response.data._metadata };
+      return { actionPlansPeople: response.data.actionPlansPeople || response.data.actionplanspeople, _metadata: response.data._metadata };
     }
     case 'addPersonToActionPlan': {
       const response = await fubApi.post('/actionPlansPeople', args);
@@ -2568,7 +2568,7 @@ async function handleToolCall(name, rawArgs) {
     case 'listAutomationsPeople': {
       requireSystemCreds('listAutomationsPeople');
       const response = await fubApi.get('/automationsPeople', { params: args });
-      return { automationsPeople: response.data.automationsPeople, _metadata: response.data._metadata };
+      return { automationsPeople: response.data.automationsPeople || response.data.automationspeople, _metadata: response.data._metadata };
     }
     case 'getAutomationPerson': {
       requireSystemCreds('getAutomationPerson');
@@ -2617,7 +2617,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== TEXT MESSAGE TEMPLATES ====================
     case 'listTextMessageTemplates': {
       const response = await fubApi.get('/textMessageTemplates', { params: args });
-      return { textMessageTemplates: response.data.textMessageTemplates, _metadata: response.data._metadata };
+      return { textMessageTemplates: response.data.textMessageTemplates || response.data.textmessagetemplates, _metadata: response.data._metadata };
     }
     case 'createTextMessageTemplate': {
       const response = await fubApi.post('/textMessageTemplates', args);
@@ -2644,7 +2644,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== EMAIL MARKETING ====================
     case 'listEmEvents': {
       const response = await fubApi.get('/emEvents', { params: args });
-      return { emEvents: response.data.emEvents, _metadata: response.data._metadata };
+      return { emEvents: response.data.emEvents || response.data.emevents, _metadata: response.data._metadata };
     }
     case 'createEmEvent': {
       const response = await fubApi.post('/emEvents', args);
@@ -2652,7 +2652,7 @@ async function handleToolCall(name, rawArgs) {
     }
     case 'listEmCampaigns': {
       const response = await fubApi.get('/emCampaigns', { params: args });
-      return { emCampaigns: response.data.emCampaigns, _metadata: response.data._metadata };
+      return { emCampaigns: response.data.emCampaigns || response.data.emcampaigns, _metadata: response.data._metadata };
     }
     case 'createEmCampaign': {
       const response = await fubApi.post('/emCampaigns', args);
@@ -2667,7 +2667,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== CUSTOM FIELDS ====================
     case 'listCustomFields': {
       const response = await fubApi.get('/customFields');
-      return { customFields: response.data.customFields, _metadata: response.data._metadata };
+      return { customFields: response.data.customFields || response.data.customfields, _metadata: response.data._metadata };
     }
     case 'createCustomField': {
       const response = await fubApi.post('/customFields', args);
@@ -2761,7 +2761,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== APPOINTMENT TYPES ====================
     case 'listAppointmentTypes': {
       const response = await fubApi.get('/appointmentTypes');
-      return { appointmentTypes: response.data.appointmentTypes, _metadata: response.data._metadata };
+      return { appointmentTypes: response.data.appointmentTypes || response.data.appointmenttypes, _metadata: response.data._metadata };
     }
     case 'createAppointmentType': {
       const response = await fubApi.post('/appointmentTypes', args);
@@ -2784,7 +2784,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== APPOINTMENT OUTCOMES ====================
     case 'listAppointmentOutcomes': {
       const response = await fubApi.get('/appointmentOutcomes');
-      return { appointmentOutcomes: response.data.appointmentOutcomes, _metadata: response.data._metadata };
+      return { appointmentOutcomes: response.data.appointmentOutcomes || response.data.appointmentoutcomes, _metadata: response.data._metadata };
     }
     case 'createAppointmentOutcome': {
       const response = await fubApi.post('/appointmentOutcomes', args);
@@ -2906,7 +2906,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== DEAL CUSTOM FIELDS ====================
     case 'listDealCustomFields': {
       const response = await fubApi.get('/dealCustomFields');
-      return { dealCustomFields: response.data.dealCustomFields, _metadata: response.data._metadata };
+      return { dealCustomFields: response.data.dealCustomFields || response.data.dealcustomfields, _metadata: response.data._metadata };
     }
     case 'createDealCustomField': {
       const body = translateDealCustomFieldArgs(args);
@@ -2981,7 +2981,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== TEAM INBOXES ====================
     case 'listTeamInboxes': {
       const response = await fubApi.get('/teamInboxes');
-      return { teamInboxes: response.data.teamInboxes, _metadata: response.data._metadata };
+      return { teamInboxes: response.data.teamInboxes || response.data.teaminboxes, _metadata: response.data._metadata };
     }
 
     // ==================== PONDS ====================
