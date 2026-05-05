@@ -584,6 +584,19 @@ const TOOL_DEFINITIONS = [
 
 // ==================== NOTES ====================
 {
+  "name": "listNotes",
+  "description": "List notes, optionally filtered by personId",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "personId": { "type": "number", "description": "Filter notes by person ID" },
+      "limit": { "type": "number", "description": "Max results to return" },
+      "offset": { "type": "number", "description": "Pagination offset" }
+    },
+    "required": []
+  }
+},
+{
   "name": "createNote",
   "description": "Create a note on a person",
   "inputSchema": {
@@ -2440,6 +2453,10 @@ async function handleToolCall(name, rawArgs) {
     }
 
     // ==================== NOTES ====================
+    case 'listNotes': {
+      const response = await fubApi.get('/notes', { params: args });
+      return { notes: response.data.notes, _metadata: response.data._metadata };
+    }
     case 'createNote': {
       const response = await fubApi.post('/notes', args);
       return response.data;
