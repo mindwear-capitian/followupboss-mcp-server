@@ -2499,7 +2499,7 @@ async function handleToolCall(name, rawArgs) {
     // ==================== TEXT MESSAGES ====================
     case 'listTextMessages': {
       const response = await fubApi.get('/textMessages', { params: args });
-      return { textMessages: response.data.textMessages, _metadata: response.data._metadata };
+      return { textMessages: response.data.textMessages || response.data.textmessages, _metadata: response.data._metadata };
     }
     case 'createTextMessage': {
       requireSystemCreds('createTextMessage');
