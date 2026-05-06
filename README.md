@@ -1,8 +1,25 @@
-# Follow Up Boss MCP Server
+# Follow Up Boss MCP Server — Built for Realtors
 
-Connect your Follow Up Boss CRM to Claude AI (or any MCP-compatible tool) with 157 tools covering all official API endpoints plus convenience tools for common workflows.
+> Talk to your Follow Up Boss CRM in plain English from Claude AI (or any MCP-compatible tool). 159 tools covering 100% of the official API, plus `about`/`help` meta tools. Built by a working real estate broker, not a dev shop.
 
-> **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. Use at your own risk. We strongly recommend testing with a small number of records first, and always reviewing AI-suggested actions before confirming changes to your live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
+**Built by [Ed Neuhaus](https://neuhausre.com) — broker / owner at [Neuhaus Realty Group](https://neuhausre.com) in Austin, Texas.** Licensed real estate broker since 2009, 19+ years in the business. I built this because I wanted to talk to my own FUB account in plain English. It's free for self-host use under the [Elastic License 2.0](LICENSE).
+
+### Other things I'm working on
+
+- **[NeuhausRE.com](https://neuhausre.com)** — My brokerage's site, AI-powered home search
+- **[StaySTRA.com](https://staystra.com)** — Short-term rental investment analyzer
+- **[mls.neuhausre.com](https://mls.neuhausre.com)** — MLS MCP server (live MLS data via Claude Desktop)
+- **[Kendall Creek Properties](https://kendallcreekproperties.com)** — Sister brokerage
+
+### Want to thank me?
+
+1. **Got a real estate referral?** I take referrals from licensed agents in any state for clients moving to or from Texas. Reach out via **[neuhausre.com/contact](https://neuhausre.com/contact)**.
+2. **Write about it.** Blog post, LinkedIn, X — tag me and link to neuhausre.com.
+3. **Open an issue or PR** if you find a bug or build something useful.
+
+> **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. **Strongly recommended: back up your FUB data before turning this loose, unless you really know what you're doing.** Always review AI-suggested actions before confirming changes to live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
+
+> **License note:** This project moved from MIT to **[Elastic License 2.0](LICENSE)** in v1.1.2. You may use, modify, and self-host for your own business at no cost. You may **not** offer it as a hosted/managed service to third parties. For commercial hosting rights, reach out via [neuhausre.com/contact](https://neuhausre.com/contact). Versions ≤ v1.1.1 remain MIT-licensed.
 
 ## What This Does
 
@@ -83,7 +100,7 @@ This will:
 | Create new records | Yes | Yes |
 | Update existing records | Yes | Yes |
 | **Delete records** | **No** | Yes |
-| Tools available | 134 | 157 |
+| Tools available | 136 | 159 |
 
 **Safe Mode is the default** and recommended for most users. It gives you everything except the ability to delete data. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
 
@@ -347,7 +364,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 
 > "What action plans do I have set up?"
 
-## All 157 Available Tools
+## All 159 Available Tools
 
 <details>
 <summary>Click to expand full tool list</summary>
@@ -650,6 +667,13 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | `bulkUpdatePeople` | Update multiple people at once with automatic rate limiting |
 | `listAvailableTags` | Discover all tags in your account by scanning contacts |
 
+### Meta Tools (2 tools, new in v1.1.2)
+
+| Tool | Description |
+|------|-------------|
+| `about` | Author bio, related projects, contributors, "how to thank me" |
+| `help` | Usage tips, common tool examples, bug report links |
+
 </details>
 
 ## Rate Limiting
@@ -717,12 +741,12 @@ Contributions are welcome! Here's how:
 6. Push: `git push origin my-feature`
 7. Open a Pull Request
 
-Please keep the code style consistent and make sure all 157 tools continue to work.
+Please keep the code style consistent and make sure all 159 tools continue to work.
 
 ## License
 
-MIT -- see [LICENSE](LICENSE) for details.
+[Elastic License 2.0](LICENSE) -- self-host free, no SaaS resale. Versions ≤ v1.1.1 remain MIT-licensed; existing forks of those versions are unaffected. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms and attribution.
 
 ---
 
-Built by [Ed Neuhaus](https://neuhausre.com/agent/ed-neuhaus/) / [StaySTRA](https://staystra.com)
+Built by [Ed Neuhaus](https://neuhausre.com/agent/ed-neuhaus/)

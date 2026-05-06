@@ -1,7 +1,7 @@
 {
   "name": "followupboss-mcp-server",
-  "version": "1.1.1",
-  "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM - 157 tools covering 100% of the official API",
+  "version": "1.1.2",
+  "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM by Ed Neuhaus (Neuhaus Realty Group, Austin TX) - 159 tools covering 100% of the official API plus about/help meta tools",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -15,15 +15,36 @@
     "fub",
     "crm",
     "real-estate",
+    "realtor",
+    "broker",
+    "austin-tx",
     "claude",
     "ai",
-    "model-context-protocol"
+    "model-context-protocol",
+    "neuhaus-realty-group"
   ],
-  "author": "Ed Neuhaus (https://neuhausre.com)",
-  "license": "MIT",
+  "author": {
+    "name": "Ed Neuhaus",
+    "url": "https://neuhausre.com"
+  },
+  "contributors": [
+    {
+      "name": "yoship90",
+      "url": "https://github.com/yoship90"
+    },
+    {
+      "name": "chad778",
+      "url": "https://github.com/chad778"
+    }
+  ],
+  "license": "Elastic-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/mindwear-capitian/followupboss-mcp-server"
+  },
+  "homepage": "https://neuhausre.com",
+  "bugs": {
+    "url": "https://github.com/mindwear-capitian/followupboss-mcp-server/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

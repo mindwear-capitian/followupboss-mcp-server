@@ -1,0 +1,49 @@
+Follow Up Boss MCP Server
+Copyright (c) 2026 Ed Neuhaus / Neuhaus Realty Group, LLC
+
+This product includes software developed by Ed Neuhaus
+(https://neuhausre.com).
+
+Licensed under the Elastic License 2.0. See LICENSE for terms.
+
+================================================================================
+
+About the author
+
+Ed Neuhaus is a real estate broker / owner at Neuhaus Realty Group, LLC in
+Austin, Texas. Licensed since 2007, broker since 2009. 19+ years in Austin
+real estate.
+
+Other things Ed has built:
+  - NeuhausRE.com           — Brokerage site, AI-powered home search
+  - StaySTRA.com            — Short-term rental investment analyzer
+  - mls.neuhausre.com       — MLS MCP server (live MLS data via Claude)
+  - Kendall Creek Properties — Sister brokerage
+
+Contact: https://neuhausre.com/contact
+
+If you build something on top of this, or write about it, send Ed a link.
+If you have a real estate referral (licensed agents in any state are
+welcome to refer clients to Texas), reach out via https://neuhausre.com/contact.
+
+================================================================================
+
+Contributors
+
+  yoship90          Smart list API key fix and fub2/all params (v1.1.2)
+                    Original contribution: yoship90/followupboss-mcp-server@aa92bf9
+
+  chad778           OAuth 2.1 + DCR + PKCE + HTTP transport prototype
+                    Available in fork: chad778/followupboss-mcp-server
+
+================================================================================
+
+Trademarks
+
+"Follow Up Boss" is a trademark of Follow Up Boss, Inc. This project is not
+affiliated with, endorsed by, or sponsored by Follow Up Boss, Inc. It is an
+independent integration that uses the public Follow Up Boss API.
+
+"Claude" is a trademark of Anthropic, PBC. This project is an independent
+implementation of the Model Context Protocol and is not affiliated with or
+endorsed by Anthropic.
