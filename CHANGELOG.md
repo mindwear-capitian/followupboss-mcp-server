@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.3 — 2026-05-12
+
+### Fixed (from May 11 systematic audit of all 159 tools)
+
+- **Meta-parameter leak.** The MCP orchestration param `wait_for_previous` (and other `_meta` / `__mcp` / `__progressToken` keys) was being passed straight through to the FUB API body, which then returned `400 Invalid fields in the request body`. Added a `stripMetaParams` sanitizer at the top of `handleToolCall` so any MCP-host-injected meta keys are dropped before the request hits FUB.
+- **`createCall` / `updateCall` schema mismatch.** Tool exposed `direction` (string) and `notes` (plural). FUB actually requires `isIncoming` (boolean) and `note` (singular). Schemas updated to the FUB canonical names; a `translateCallArgs` shim maps legacy `direction`/`notes` to the new fields so older agents keep working.
+- **`createDeal` / `updateDeal` schema mismatch.** Tool exposed `personId` + `value`. FUB requires `peopleIds` (array) + `price`. `name` + `stageId` made required to match the API. `translateDealArgs` shim maps legacy `personId`/`value` to `peopleIds`/`price`.
+- **`createRelationship` body shape was fundamentally wrong.** Old schema treated this as a link between two existing people (`personId` + `relatedPersonId`). FUB models a relationship as its OWN contact record attached to one `personId` via `type` (Spouse, Brother, Partner, etc.) plus `firstName`/`lastName`/`emails`/`phones`/`addresses`. Schema rewritten. Legacy `relationshipType` → `type` via shim; the meaningless `relatedPersonId` is dropped.
+- **`createDealCustomField` field name.** Tool exposed `name` + `options`. FUB requires `label` + `choices` (and rejects with "Field label cannot be blank"). Schema fixed; `translateDealCustomFieldArgs` shim translates legacy `name` → `label` and `options` → `choices`.
+- **`createAppointment` / `updateAppointment` schema.** Tool exposed `startTime`/`endTime`/`appointmentTypeId`/`appointmentOutcomeId`/top-level `personId`. FUB requires `start`/`end`/`typeId`/`outcomeId` and uses `invitees: [{type:'person'|'user', id}]` for attendees. Schema fixed. `translateAppointmentArgs` maps legacy fields and converts a top-level `personId` into an `invitees` entry.
+- **Inbox App pathing 404s.** All `inboxApp*` tools were hitting paths like `/inboxApps/addMessage` and `/inboxApps/installations` that don't exist in FUB's API, so FUB returned `404: Collection name '' in the URL is not valid`. Corrected to the documented paths:
+  - `inboxAppAddMessage` → `POST /inboxApps/messages`
+  - `inboxAppUpdateMessage` → `PUT /inboxApps/messages/:id`
+  - `inboxAppAddNote` → `POST /inboxApps/notes`
+  - `inboxAppUpdateConversation` → `PUT /inboxApps/conversations/:id`
+  - `inboxAppDeleteParticipant` → `DELETE /inboxApps/participants/:id` (was DELETE with body)
+  - `inboxAppDeactivate` → `DELETE /inboxApps/:id` (was `/inboxApps/deactivate`; now requires `id`)
+  - `listInboxAppInstallations` → `GET /inboxApps` (was `/inboxApps/installations`)
+  - `inboxAppInstall` schema corrected to FUB's actual body: `publishedInboxAppId` + `userId` + `subscriptionUrl`.
+- **Webhook tools missing `X-System` / `X-System-Key` headers.** FUB requires both headers on every webhook endpoint (creation is restricted to account owners + registered systems). Added `FUB_SYSTEM` + `FUB_SYSTEM_KEY` env vars; when set, both headers are sent automatically. Webhook tools throw an actionable error if the env vars are missing instead of producing a confusing 400 from FUB.
+
+### Added
+
+- `FUB_SYSTEM` and `FUB_SYSTEM_KEY` environment variables for third-party system registration (required by webhook endpoints; harmless on everything else).
+- Better 403 error surface: when FUB returns 403 Forbidden the MCP response now includes a `hint` listing the tools that commonly require elevated permissions (`createTextMessage`, `listAutomations`, `createPersonAttachment`, `createDealAttachment`, all webhook + inbox app tools).
+- `test-fixes.js` regression test that exercises the six audit-fix scenarios live against FUB.
+
+### Notes
+- 403 errors on `createTextMessage`, `listAutomations`, `createPersonAttachment`, `createDealAttachment` from the May 11 audit are FUB account-scope issues (feature not enabled or API key lacks scope), not code bugs. The new 403 hint surfaces this directly to the AI client.
+
 ## v1.1.2 — 2026-05-06
 
 ### Fixed

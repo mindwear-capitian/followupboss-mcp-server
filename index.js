@@ -60,15 +60,120 @@ if (!FUB_API_KEY) {
 
 const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
 const FUB_BASE_URL = 'https://api.followupboss.com/v1';
+const FUB_SYSTEM = process.env.FUB_SYSTEM || '';
+const FUB_SYSTEM_KEY = process.env.FUB_SYSTEM_KEY || '';
 
 const fubApi = axios.create({
   baseURL: FUB_BASE_URL,
   auth: { username: FUB_API_KEY, password: '' },
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    ...(FUB_SYSTEM ? { 'X-System': FUB_SYSTEM } : {}),
+    ...(FUB_SYSTEM_KEY ? { 'X-System-Key': FUB_SYSTEM_KEY } : {})
   }
 });
+
+// MCP orchestration / internal params that must NEVER be forwarded to FUB API.
+// FUB returns 400 if any unknown field is in the body.
+const META_PARAM_KEYS = new Set([
+  'wait_for_previous',
+  '_meta',
+  '__mcp',
+  '__progressToken'
+]);
+
+function stripMetaParams(args) {
+  if (!args || typeof args !== 'object') return args;
+  const cleaned = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (META_PARAM_KEYS.has(k)) continue;
+    cleaned[k] = v;
+  }
+  return cleaned;
+}
+
+// ---------------------------------------------------------------------------
+// Schema translators — accept legacy tool-arg names, emit FUB-canonical fields.
+// Lets older agents keep working while sending FUB exactly what it expects.
+// ---------------------------------------------------------------------------
+
+function translateCallArgs(args) {
+  const { direction, notes, occurredAt, ...rest } = args;
+  const out = { ...rest };
+  if (direction !== undefined && out.isIncoming === undefined) {
+    const d = String(direction).toLowerCase();
+    out.isIncoming = (d === 'inbound' || d === 'incoming' || d === 'in');
+  }
+  if (notes !== undefined && out.note === undefined) {
+    out.note = notes;
+  }
+  // occurredAt is not in FUB's create-call body; drop it.
+  return out;
+}
+
+function translateDealArgs(args) {
+  const { personId, value, ...rest } = args;
+  const out = { ...rest };
+  if (personId !== undefined && out.peopleIds === undefined) {
+    out.peopleIds = Array.isArray(personId) ? personId : [personId];
+  }
+  if (value !== undefined && out.price === undefined) {
+    out.price = value;
+  }
+  return out;
+}
+
+function translateDealCustomFieldArgs(args) {
+  const { name, options, ...rest } = args;
+  const out = { ...rest };
+  if (name !== undefined && out.label === undefined) {
+    out.label = name;
+  }
+  if (options !== undefined && out.choices === undefined) {
+    out.choices = options;
+  }
+  return out;
+}
+
+function requireWebhookCreds() {
+  if (!FUB_SYSTEM || !FUB_SYSTEM_KEY) {
+    throw new Error(
+      'Webhook endpoints require X-System + X-System-Key headers. Set FUB_SYSTEM and FUB_SYSTEM_KEY env vars to your registered third-party system name and key. Webhook creation is restricted to FUB account owners and registered systems.'
+    );
+  }
+}
+
+function translateRelationshipArgs(args) {
+  // Legacy callers used relatedPersonId + relationshipType. FUB actually models
+  // relationships as a new contact record attached to one personId via `type`.
+  // Strip relatedPersonId (no longer meaningful) and rename relationshipType → type.
+  const { relatedPersonId, relationshipType, notes, ...rest } = args;
+  const out = { ...rest };
+  if (relationshipType !== undefined && out.type === undefined) {
+    out.type = relationshipType;
+  }
+  // relatedPersonId + notes have no FUB equivalent on this endpoint; drop them.
+  return out;
+}
+
+function translateAppointmentArgs(args) {
+  const {
+    startTime, endTime, appointmentTypeId, appointmentOutcomeId, personId,
+    ...rest
+  } = args;
+  const out = { ...rest };
+  if (startTime !== undefined && out.start === undefined) out.start = startTime;
+  if (endTime !== undefined && out.end === undefined) out.end = endTime;
+  if (appointmentTypeId !== undefined && out.typeId === undefined) out.typeId = appointmentTypeId;
+  if (appointmentOutcomeId !== undefined && out.outcomeId === undefined) out.outcomeId = appointmentOutcomeId;
+  if (personId !== undefined) {
+    const list = Array.isArray(out.invitees) ? [...out.invitees] : [];
+    list.push({ type: 'person', id: personId });
+    out.invitees = list;
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Retry logic for rate limiting (429)
@@ -391,16 +496,19 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createRelationship",
-  "description": "Create a relationship between two people",
+  "description": "Create a relationship contact (Spouse, Brother, Partner, etc.) for an existing person. The relationship is its own contact record linked to personId — it is NOT a link between two existing people.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "First person ID" },
-      "relatedPersonId": { "type": "number", "description": "Related person ID" },
-      "relationshipType": { "type": "string", "description": "Type of relationship" },
-      "notes": { "type": "string", "description": "Notes about the relationship" }
+      "personId": { "type": "number", "description": "Person ID this relationship is associated with" },
+      "firstName": { "type": "string", "description": "First name of the relationship contact" },
+      "lastName": { "type": "string", "description": "Last name of the relationship contact" },
+      "type": { "type": "string", "description": "Relationship type (e.g. Spouse, Brother, Partner)" },
+      "emails": { "type": "array", "description": "Email addresses [{type, value}]", "items": { "type": "object" } },
+      "phones": { "type": "array", "description": "Phone numbers [{type, value}]", "items": { "type": "object" } },
+      "addresses": { "type": "array", "description": "Mailing addresses [{type, street, city, state, code, country}]", "items": { "type": "object" } }
     },
-    "required": ["personId", "relatedPersonId"]
+    "required": ["personId"]
   }
 },
 {
@@ -416,13 +524,17 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateRelationship",
-  "description": "Update a relationship",
+  "description": "Update a relationship contact",
   "inputSchema": {
     "type": "object",
     "properties": {
       "id": { "type": "number", "description": "Relationship ID" },
-      "relationshipType": { "type": "string", "description": "Type of relationship" },
-      "notes": { "type": "string", "description": "Notes" }
+      "firstName": { "type": "string" },
+      "lastName": { "type": "string" },
+      "type": { "type": "string", "description": "Relationship type (e.g. Spouse)" },
+      "emails": { "type": "array", "items": { "type": "object" } },
+      "phones": { "type": "array", "items": { "type": "object" } },
+      "addresses": { "type": "array", "items": { "type": "object" } }
     },
     "required": ["id"]
   }
@@ -518,16 +630,20 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createCall",
-  "description": "Log a call for a person",
+  "description": "Log a call for a person. FUB expects isIncoming (boolean) and note (singular).",
   "inputSchema": {
     "type": "object",
     "properties": {
       "personId": { "type": "number", "description": "Person ID" },
+      "phone": { "type": "string", "description": "Phone number on the call" },
+      "isIncoming": { "type": "boolean", "description": "true = inbound, false = outbound" },
       "duration": { "type": "number", "description": "Call duration in seconds" },
-      "direction": { "type": "string", "description": "Call direction: inbound or outbound" },
+      "note": { "type": "string", "description": "Call note" },
+      "outcome": { "type": "string", "description": "Call outcome" },
       "userId": { "type": "number", "description": "User who made the call" },
-      "notes": { "type": "string", "description": "Call notes" },
-      "occurredAt": { "type": "string", "description": "ISO timestamp when call occurred" }
+      "toNumber": { "type": "string", "description": "Destination number" },
+      "fromNumber": { "type": "string", "description": "Originating number" },
+      "recordingUrl": { "type": "string", "description": "Recording URL" }
     },
     "required": ["personId"]
   }
@@ -551,11 +667,15 @@ const TOOL_DEFINITIONS = [
     "properties": {
       "id": { "type": "number", "description": "Call ID" },
       "personId": { "type": "number", "description": "Person ID" },
+      "phone": { "type": "string", "description": "Phone number" },
+      "isIncoming": { "type": "boolean", "description": "true = inbound" },
       "duration": { "type": "number", "description": "Duration" },
-      "direction": { "type": "string", "description": "Direction" },
       "userId": { "type": "number", "description": "User ID" },
-      "notes": { "type": "string", "description": "Notes" },
-      "occurredAt": { "type": "string", "description": "Timestamp" }
+      "note": { "type": "string", "description": "Note" },
+      "outcome": { "type": "string", "description": "Outcome" },
+      "toNumber": { "type": "string" },
+      "fromNumber": { "type": "string" },
+      "recordingUrl": { "type": "string" }
     },
     "required": ["id"]
   }
@@ -1208,21 +1328,22 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createAppointment",
-  "description": "Create an appointment",
+  "description": "Create an appointment. FUB uses start/end (not startTime/endTime), typeId/outcomeId (not appointmentTypeId/appointmentOutcomeId), and invitees:[{type:'person'|'user',id}] (personId is NOT a top-level field).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "appointmentTypeId": { "type": "number", "description": "Appointment type ID" },
-      "appointmentOutcomeId": { "type": "number", "description": "Outcome ID" },
-      "invitees": { "type": "array", "description": "Invitees", "items": { "type": "object" } },
-      "startTime": { "type": "string", "description": "Start time ISO" },
-      "endTime": { "type": "string", "description": "End time ISO" },
-      "title": { "type": "string", "description": "Appointment title" },
+      "title": { "type": "string", "description": "Appointment title (required)" },
+      "start": { "type": "string", "description": "Start ISO 8601 (required)" },
+      "end": { "type": "string", "description": "End ISO 8601 (required)" },
       "description": { "type": "string", "description": "Description" },
-      "location": { "type": "string", "description": "Location" }
+      "invitees": { "type": "array", "description": "Array of {type:'person'|'user', id:int}", "items": { "type": "object" } },
+      "allDay": { "type": "boolean" },
+      "location": { "type": "string", "description": "Location" },
+      "typeId": { "type": "number", "description": "Appointment type ID" },
+      "outcomeId": { "type": "number", "description": "Appointment outcome ID" },
+      "createdById": { "type": "number", "description": "Creator user ID (admin only)" }
     },
-    "required": []
+    "required": ["title", "start", "end"]
   }
 },
 {
@@ -1243,15 +1364,15 @@ const TOOL_DEFINITIONS = [
     "type": "object",
     "properties": {
       "id": { "type": "number", "description": "Appointment ID" },
-      "personId": { "type": "number", "description": "Person ID" },
-      "appointmentTypeId": { "type": "number", "description": "Type ID" },
-      "appointmentOutcomeId": { "type": "number", "description": "Outcome ID" },
-      "invitees": { "type": "array", "description": "Invitees", "items": { "type": "object" } },
-      "startTime": { "type": "string", "description": "Start time" },
-      "endTime": { "type": "string", "description": "End time" },
-      "title": { "type": "string", "description": "Title" },
-      "description": { "type": "string", "description": "Description" },
-      "location": { "type": "string", "description": "Location" }
+      "title": { "type": "string" },
+      "start": { "type": "string", "description": "Start ISO" },
+      "end": { "type": "string", "description": "End ISO" },
+      "description": { "type": "string" },
+      "invitees": { "type": "array", "items": { "type": "object" } },
+      "allDay": { "type": "boolean" },
+      "location": { "type": "string" },
+      "typeId": { "type": "number", "description": "Type ID" },
+      "outcomeId": { "type": "number", "description": "Outcome ID" }
     },
     "required": ["id"]
   }
@@ -1512,20 +1633,28 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createDeal",
-  "description": "Create a deal",
+  "description": "Create a deal. FUB expects peopleIds (array) and price (number). name + stageId required.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "pipelineId": { "type": "number", "description": "Pipeline ID" },
-      "stageId": { "type": "number", "description": "Stage ID" },
-      "personId": { "type": "number", "description": "Person ID" },
-      "userIds": { "type": "array", "description": "Assigned user IDs", "items": { "type": "number" } },
       "name": { "type": "string", "description": "Deal name" },
-      "value": { "type": "number", "description": "Deal value" },
-      "closingDate": { "type": "string", "description": "Closing date ISO" },
-      "orderWeight": { "type": "number", "description": "Sort order weight" }
+      "stageId": { "type": "number", "description": "Stage ID (required)" },
+      "description": { "type": "string", "description": "Deal description" },
+      "peopleIds": { "type": "array", "description": "Person IDs on the deal", "items": { "type": "number" } },
+      "userIds": { "type": "array", "description": "Assigned user IDs", "items": { "type": "number" } },
+      "price": { "type": "number", "description": "Deal price" },
+      "projectedCloseDate": { "type": "string", "description": "Projected close date" },
+      "orderWeight": { "type": "number", "description": "Sort order weight" },
+      "commissionValue": { "type": "number" },
+      "agentCommission": { "type": "number" },
+      "teamCommission": { "type": "number" },
+      "earnestMoneyDueDate": { "type": "string" },
+      "mutualAcceptanceDate": { "type": "string" },
+      "dueDiligenceDate": { "type": "string" },
+      "finalWalkThroughDate": { "type": "string" },
+      "possessionDate": { "type": "string" }
     },
-    "required": []
+    "required": ["name", "stageId"]
   }
 },
 {
@@ -1541,17 +1670,16 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateDeal",
-  "description": "Update a deal",
+  "description": "Update a deal. Use price (not value) and peopleIds (not personId).",
   "inputSchema": {
     "type": "object",
     "properties": {
       "id": { "type": "number", "description": "Deal ID" },
       "name": { "type": "string", "description": "Name" },
-      "pipelineId": { "type": "number", "description": "Pipeline ID" },
       "stageId": { "type": "number", "description": "Stage ID" },
-      "personId": { "type": "number", "description": "Person ID" },
+      "peopleIds": { "type": "array", "description": "People on deal", "items": { "type": "number" } },
       "userIds": { "type": "array", "description": "User IDs", "items": { "type": "number" } },
-      "value": { "type": "number", "description": "Value" },
+      "price": { "type": "number", "description": "Price" },
       "description": { "type": "string", "description": "Description" }
     },
     "required": ["id"]
@@ -1630,15 +1758,19 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createDealCustomField",
-  "description": "Create a deal custom field",
+  "description": "Create a deal custom field. FUB expects 'label' (not 'name') and 'choices' (not 'options').",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Field name" },
-      "type": { "type": "string", "description": "Field type" },
-      "options": { "type": "array", "description": "Dropdown options", "items": { "type": "string" } }
+      "label": { "type": "string", "description": "User-friendly field name" },
+      "type": { "type": "string", "description": "Field type: text, date, number, dropdown" },
+      "choices": { "type": "array", "description": "Dropdown choices (dropdown only)", "items": { "type": "string" } },
+      "isRecurring": { "type": "boolean" },
+      "hideIfEmpty": { "type": "boolean" },
+      "orderWeight": { "type": "number" },
+      "readOnly": { "type": "boolean" }
     },
-    "required": ["name", "type"]
+    "required": ["label", "type"]
   }
 },
 {
@@ -1659,9 +1791,13 @@ const TOOL_DEFINITIONS = [
     "type": "object",
     "properties": {
       "id": { "type": "number", "description": "Field ID" },
-      "name": { "type": "string", "description": "Name" },
-      "type": { "type": "string", "description": "Type" },
-      "options": { "type": "array", "description": "Options", "items": { "type": "string" } }
+      "label": { "type": "string", "description": "User-friendly field name" },
+      "type": { "type": "string", "description": "Field type" },
+      "choices": { "type": "array", "items": { "type": "string" } },
+      "isRecurring": { "type": "boolean" },
+      "hideIfEmpty": { "type": "boolean" },
+      "orderWeight": { "type": "number" },
+      "readOnly": { "type": "boolean" }
     },
     "required": ["id"]
   }
@@ -1933,32 +2069,38 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "inboxAppDeleteParticipant",
-  "description": "Remove a participant from an inbox app conversation",
+  "description": "Remove a participant from an inbox app conversation by participant id",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" },
-      "personId": { "type": "number", "description": "Person ID to remove" }
+      "id": { "type": "number", "description": "Participant ID" }
     },
-    "required": ["conversationId", "personId"]
+    "required": ["id"]
   }
 },
 {
   "name": "inboxAppInstall",
-  "description": "Install an inbox app",
+  "description": "Install an inbox app for a user. Requires the publishedInboxAppId from FUB's app catalog plus a webhook subscriptionUrl.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "App name" },
-      "url": { "type": "string", "description": "App URL" }
+      "publishedInboxAppId": { "type": "number", "description": "Published inbox app ID from FUB catalog" },
+      "userId": { "type": "number", "description": "User to install for" },
+      "subscriptionUrl": { "type": "string", "description": "Webhook subscription URL" }
     },
-    "required": ["name", "url"]
+    "required": ["publishedInboxAppId", "userId", "subscriptionUrl"]
   }
 },
 {
   "name": "inboxAppDeactivate",
-  "description": "Deactivate the inbox app",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "Deactivate an inbox app installation by ID",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "number", "description": "Installation ID" }
+    },
+    "required": ["id"]
+  }
 },
 {
   "name": "listInboxAppInstallations",
@@ -2099,7 +2241,8 @@ const TOOL_DEFINITIONS = [
 // Tool Handler
 // ---------------------------------------------------------------------------
 
-async function handleToolCall(name, args) {
+async function handleToolCall(name, rawArgs) {
+  const args = stripMetaParams(rawArgs);
   try {
     switch (name) {
 
@@ -2107,7 +2250,7 @@ async function handleToolCall(name, args) {
     case 'about': {
       return {
         server: 'Follow Up Boss MCP Server',
-        version: '1.1.2',
+        version: '1.1.3',
         author: {
           name: 'Ed Neuhaus',
           title: 'Broker / Owner',
@@ -2140,7 +2283,7 @@ async function handleToolCall(name, args) {
     }
     case 'help': {
       return {
-        server: 'Follow Up Boss MCP Server v1.1.2',
+        server: 'Follow Up Boss MCP Server v1.1.3',
         getting_started: 'Set FUB_API_KEY in your MCP host config (Claude Desktop, Claude Code, Cline, Cursor, etc.). Run `npm run setup` for an interactive wizard.',
         common_examples: [
           '"Show me my smart lists" → listSmartLists ({all: true} to include modern UI lists)',
@@ -2235,7 +2378,8 @@ async function handleToolCall(name, args) {
       return { peopleRelationships: response.data.peopleRelationships, _metadata: response.data._metadata };
     }
     case 'createRelationship': {
-      const response = await fubApi.post('/peopleRelationships', args);
+      const body = translateRelationshipArgs(args);
+      const response = await fubApi.post('/peopleRelationships', body);
       return response.data;
     }
     case 'getRelationship': {
@@ -2243,7 +2387,8 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateRelationship': {
-      const { id, ...body } = args;
+      const { id, ...rest } = args;
+      const body = translateRelationshipArgs(rest);
       const response = await fubApi.put(`/peopleRelationships/${id}`, body);
       return response.data;
     }
@@ -2287,7 +2432,8 @@ async function handleToolCall(name, args) {
       return { calls: response.data.calls, _metadata: response.data._metadata };
     }
     case 'createCall': {
-      const response = await fubApi.post('/calls', args);
+      const body = translateCallArgs(args);
+      const response = await fubApi.post('/calls', body);
       return response.data;
     }
     case 'getCall': {
@@ -2295,7 +2441,8 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateCall': {
-      const { id, ...body } = args;
+      const { id, ...rest } = args;
+      const body = translateCallArgs(rest);
       const response = await fubApi.put(`/calls/${id}`, body);
       return response.data;
     }
@@ -2536,7 +2683,8 @@ async function handleToolCall(name, args) {
       return { appointments: response.data.appointments, _metadata: response.data._metadata };
     }
     case 'createAppointment': {
-      const response = await fubApi.post('/appointments', args);
+      const body = translateAppointmentArgs(args);
+      const response = await fubApi.post('/appointments', body);
       return response.data;
     }
     case 'getAppointment': {
@@ -2544,7 +2692,8 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateAppointment': {
-      const { id, ...body } = args;
+      const { id, ...rest } = args;
+      const body = translateAppointmentArgs(rest);
       const response = await fubApi.put(`/appointments/${id}`, body);
       return response.data;
     }
@@ -2601,10 +2750,12 @@ async function handleToolCall(name, args) {
 
     // ==================== WEBHOOKS ====================
     case 'listWebhooks': {
+      requireWebhookCreds();
       const response = await fubApi.get('/webhooks');
       return { webhooks: response.data.webhooks, _metadata: response.data._metadata };
     }
     case 'createWebhook': {
+      requireWebhookCreds();
       const response = await fubApi.post('/webhooks', args);
       return response.data;
     }
@@ -2613,11 +2764,13 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateWebhook': {
+      requireWebhookCreds();
       const { id, ...body } = args;
       const response = await fubApi.put(`/webhooks/${id}`, body);
       return response.data;
     }
     case 'deleteWebhook': {
+      requireWebhookCreds();
       await fubApi.delete(`/webhooks/${args.id}`);
       return { success: true, message: `Webhook ${args.id} deleted` };
     }
@@ -2655,7 +2808,8 @@ async function handleToolCall(name, args) {
       return { deals: response.data.deals, _metadata: response.data._metadata };
     }
     case 'createDeal': {
-      const response = await fubApi.post('/deals', args);
+      const body = translateDealArgs(args);
+      const response = await fubApi.post('/deals', body);
       return response.data;
     }
     case 'getDeal': {
@@ -2663,7 +2817,8 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateDeal': {
-      const { id, ...body } = args;
+      const { id, ...rest } = args;
+      const body = translateDealArgs(rest);
       const response = await fubApi.put(`/deals/${id}`, body);
       return response.data;
     }
@@ -2697,7 +2852,8 @@ async function handleToolCall(name, args) {
       return { dealCustomFields: response.data.dealCustomFields, _metadata: response.data._metadata };
     }
     case 'createDealCustomField': {
-      const response = await fubApi.post('/dealCustomFields', args);
+      const body = translateDealCustomFieldArgs(args);
+      const response = await fubApi.post('/dealCustomFields', body);
       return response.data;
     }
     case 'getDealCustomField': {
@@ -2705,7 +2861,8 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'updateDealCustomField': {
-      const { id, ...body } = args;
+      const { id, ...rest } = args;
+      const body = translateDealCustomFieldArgs(rest);
       const response = await fubApi.put(`/dealCustomFields/${id}`, body);
       return response.data;
     }
@@ -2800,20 +2957,27 @@ async function handleToolCall(name, args) {
     }
 
     // ==================== INBOX APPS ====================
+    // FUB inbox app endpoints — corrected paths per docs.followupboss.com/reference.
+    // Old "/inboxApps/addMessage" style was wrong (no such collection); FUB uses
+    // /inboxApps/messages, /inboxApps/notes, /inboxApps/conversations/:id, etc.
     case 'inboxAppAddMessage': {
-      const response = await fubApi.post('/inboxApps/addMessage', args);
+      const response = await fubApi.post('/inboxApps/messages', args);
       return response.data;
     }
     case 'inboxAppUpdateMessage': {
-      const response = await fubApi.put('/inboxApps/updateMessage', args);
+      const { messageId, id, ...body } = args;
+      const mid = messageId || id;
+      const response = await fubApi.put(`/inboxApps/messages/${mid}`, body);
       return response.data;
     }
     case 'inboxAppAddNote': {
-      const response = await fubApi.post('/inboxApps/addNote', args);
+      const response = await fubApi.post('/inboxApps/notes', args);
       return response.data;
     }
     case 'inboxAppUpdateConversation': {
-      const response = await fubApi.put('/inboxApps/updateConversation', args);
+      const { conversationId, id, ...body } = args;
+      const cid = conversationId || id;
+      const response = await fubApi.put(`/inboxApps/conversations/${cid}`, body);
       return response.data;
     }
     case 'inboxAppGetParticipants': {
@@ -2825,19 +2989,24 @@ async function handleToolCall(name, args) {
       return response.data;
     }
     case 'inboxAppDeleteParticipant': {
-      await fubApi.delete('/inboxApps/participants', { data: args });
-      return { success: true, message: 'Participant removed' };
+      const { id, participantId } = args;
+      const pid = id || participantId;
+      await fubApi.delete(`/inboxApps/participants/${pid}`);
+      return { success: true, message: `Participant ${pid} removed` };
     }
     case 'inboxAppInstall': {
       const response = await fubApi.post('/inboxApps/install', args);
       return response.data;
     }
     case 'inboxAppDeactivate': {
-      await fubApi.delete('/inboxApps/deactivate');
-      return { success: true, message: 'Inbox app deactivated' };
+      // FUB deactivates by installation id, not a fixed /deactivate path.
+      const { id } = args;
+      if (!id) throw new Error('inboxAppDeactivate requires installation id');
+      await fubApi.delete(`/inboxApps/${id}`);
+      return { success: true, message: `Inbox app ${id} deactivated` };
     }
     case 'listInboxAppInstallations': {
-      const response = await fubApi.get('/inboxApps/installations');
+      const response = await fubApi.get('/inboxApps');
       return response.data;
     }
 
@@ -2941,7 +3110,7 @@ async function handleToolCall(name, args) {
 const server = new Server(
   {
     name: 'followupboss-mcp-server',
-    version: '1.1.2',
+    version: '1.1.3',
     description: 'Follow Up Boss MCP server by Ed Neuhaus, real estate broker @ Neuhaus Realty Group (neuhausre.com). Call the `about` tool for more, or `help` for usage tips.'
   },
   { capabilities: { tools: {} } }
@@ -2969,8 +3138,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
   } catch (error) {
+    const status = error.response?.status;
+    const apiMsg = error.response?.data?.errorMessage
+      || error.response?.data?.error?.errorMessage
+      || error.message;
+    const payload = { error: apiMsg, status };
+    if (status === 403) {
+      payload.hint = 'FUB returned 403 Forbidden. Common causes: (1) feature not enabled on your FUB plan, (2) your API key lacks scope for this resource, (3) action requires account owner permissions. Tools known to require elevated permissions: createTextMessage, listAutomations, createPersonAttachment, createDealAttachment, all webhook tools, and inbox app tools.';
+    }
+    if (error.response?.data) payload.details = error.response.data;
     return {
-      content: [{ type: 'text', text: JSON.stringify({ error: error.message }, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
       isError: true,
     };
   }
@@ -2979,7 +3157,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Follow Up Boss MCP Server v1.1.2 started (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
+  console.error(`Follow Up Boss MCP Server v1.1.3 started (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
   console.error(`Built by Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX — https://neuhausre.com`);
   console.error(`Call the 'about' tool for full bio. Call 'help' for usage tips.`);
 }
