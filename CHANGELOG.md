@@ -44,6 +44,15 @@ All notable changes to this project will be documented in this file.
 - **`test-e2e.js` — full lifecycle harness.** Creates a tagged fake person, exercises every safe tool against it (read-only lists, then notes/calls/tasks/appointments/deals/dealCustomFields/relationships, with both canonical and legacy-arg paths for translator-backed tools), then deletes everything created. Explicitly skips all tools that could send (createTextMessage, addPersonToAutomation, addPersonToActionPlan, createEvent, mergeTemplate, etc.), all org-config writes, and all 403-known endpoints. Result on Ed's account: 71 pass, 0 fail, 33 intentional skips. Zero orphan fixtures left behind.
 - **All test scripts now preload `.env` themselves** so a stale parent-shell `FUB_API_KEY` can't shadow the local key.
 
+### Audit correction (May 12 follow-up)
+
+Re-checked FUB docs and corrected the categorization of five endpoints originally listed as "403 — account-scope issue." All five are actually marked **"Restricted - Registered Systems Only"** in FUB's docs and just need `X-System` + `X-System-Key` (same registered-system gate as webhooks):
+- `createTextMessage` — IMPORTANT: this endpoint is **log-only**. FUB does NOT actually send an SMS via this endpoint; it only records that your third-party SMS system sent one. The MCP tool description previously read "Send a text message" which was misleading; now corrected.
+- `createPersonAttachment` / `createDealAttachment` — `uri` must point to an externally hosted file. FUB does not host uploads.
+- `listAutomations` / `listAutomationsPeople` — Automations 2.0 routes are registered-system only.
+
+All five now route through a generalized `requireSystemCreds` guard (extending the existing `requireWebhookCreds` pattern). Without `FUB_SYSTEM` + `FUB_SYSTEM_KEY` set, callers now get an actionable error pointing them at the registration docs instead of a confusing 403 from FUB. The same guard was wired to `getAutomation`, `getAutomationPerson`, `addPersonToAutomation`, and `updateAutomationPerson` for consistency.
+
 ## v1.1.2 — 2026-05-06
 
 ### Fixed

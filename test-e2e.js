@@ -111,7 +111,9 @@ async function runReadOnlyList(client, category, tool, expectKey = null, opts = 
   if (err) {
     const m = errMsg(data);
     if (data?.status === 403) return SKIP(category, tool, `403 (perms): ${m.slice(0, 100)}`);
-    // 404 on inboxApp tools = account isn't a registered third-party system.
+    if (/X-System \+ X-System-Key headers/.test(m)) {
+      return SKIP(category, tool, `needs registered system (FUB_SYSTEM creds)`);
+    }
     if (data?.status === 404 && /inbox/i.test(tool)) {
       return SKIP(category, tool, `404 — needs registered system (FUB_SYSTEM)`);
     }

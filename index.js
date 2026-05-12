@@ -153,6 +153,16 @@ function requireWebhookCreds() {
   }
 }
 
+// FUB marks many endpoints "Restricted - Registered Systems Only" — they
+// require X-System + X-System-Key, identical to webhooks. Generalized guard:
+function requireSystemCreds(toolName) {
+  if (!FUB_SYSTEM || !FUB_SYSTEM_KEY) {
+    throw new Error(
+      `${toolName} requires X-System + X-System-Key headers (FUB marks this endpoint "Restricted - Registered Systems Only"). Set FUB_SYSTEM and FUB_SYSTEM_KEY env vars to your registered third-party system name and key. See https://docs.followupboss.com/reference#identification to register.`
+    );
+  }
+}
+
 function translateRelationshipArgs(args) {
   // Legacy callers used relatedPersonId + relationshipType. FUB actually models
   // relationships as a new contact record attached to one personId via `type`.
@@ -439,7 +449,7 @@ const TOOL_DEFINITIONS = [
 // ==================== PERSON ATTACHMENTS ====================
 {
   "name": "createPersonAttachment",
-  "description": "Attach a file to a person",
+  "description": "Attach an externally-hosted file to a person. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY env vars. `uri` must point to an externally hosted file — FUB does NOT host uploads via this endpoint (omitting URI returns 403).",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -715,13 +725,17 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "createTextMessage",
-  "description": "Send a text message to a person",
+  "description": "LOG a text message that was already sent by your registered third-party SMS system. This endpoint does NOT actually deliver an SMS — FUB only records it as a log entry on the person. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY env vars. To actually send an SMS to a lead, do it from FUB's UI or use your SMS provider's API directly.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "message": { "type": "string", "description": "Message text" },
-      "userId": { "type": "number", "description": "Sending user ID" }
+      "personId":      { "type": "number", "description": "Person ID" },
+      "message":       { "type": "string", "description": "Message body" },
+      "toNumber":      { "type": "string", "description": "Recipient phone number" },
+      "fromNumber":    { "type": "string", "description": "Sender phone number" },
+      "isIncoming":    { "type": "boolean", "description": "true = inbound to your user; default false" },
+      "externalLabel": { "type": "string", "description": "Label shown to the user (e.g. 'My SMS App')" },
+      "externalUrl":   { "type": "string", "description": "Link to view the original message in your system" }
     },
     "required": ["personId", "message"]
   }
@@ -861,7 +875,7 @@ const TOOL_DEFINITIONS = [
 // ==================== AUTOMATIONS ====================
 {
   "name": "listAutomations",
-  "description": "List all automations",
+  "description": "List all Automations 2.0 automations. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY. Account must also be on Automations 2.0.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -884,7 +898,7 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "listAutomationsPeople",
-  "description": "List people in automations",
+  "description": "List people in Automations 2.0 automations. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1717,7 +1731,7 @@ const TOOL_DEFINITIONS = [
 // ==================== DEAL ATTACHMENTS ====================
 {
   "name": "createDealAttachment",
-  "description": "Attach a file to a deal",
+  "description": "Attach an externally-hosted file to a deal. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY env vars. `uri` must point to an externally hosted file — FUB does NOT host uploads via this endpoint (omitting URI returns 403).",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -2372,6 +2386,7 @@ async function handleToolCall(name, rawArgs) {
 
     // ==================== PERSON ATTACHMENTS ====================
     case 'createPersonAttachment': {
+      requireSystemCreds('createPersonAttachment');
       const response = await fubApi.post('/personAttachments', args);
       return response.data;
     }
@@ -2470,6 +2485,7 @@ async function handleToolCall(name, rawArgs) {
       return { textMessages: response.data.textMessages, _metadata: response.data._metadata };
     }
     case 'createTextMessage': {
+      requireSystemCreds('createTextMessage');
       const response = await fubApi.post('/textMessages', args);
       return response.data;
     }
@@ -2523,26 +2539,32 @@ async function handleToolCall(name, rawArgs) {
 
     // ==================== AUTOMATIONS ====================
     case 'listAutomations': {
+      requireSystemCreds('listAutomations');
       const response = await fubApi.get('/automations', { params: args });
       return { automations: response.data.automations, _metadata: response.data._metadata };
     }
     case 'getAutomation': {
+      requireSystemCreds('getAutomation');
       const response = await fubApi.get(`/automations/${args.id}`);
       return response.data;
     }
     case 'listAutomationsPeople': {
+      requireSystemCreds('listAutomationsPeople');
       const response = await fubApi.get('/automationsPeople', { params: args });
       return { automationsPeople: response.data.automationsPeople, _metadata: response.data._metadata };
     }
     case 'getAutomationPerson': {
+      requireSystemCreds('getAutomationPerson');
       const response = await fubApi.get(`/automationsPeople/${args.id}`);
       return response.data;
     }
     case 'addPersonToAutomation': {
+      requireSystemCreds('addPersonToAutomation');
       const response = await fubApi.post('/automationsPeople', args);
       return response.data;
     }
     case 'updateAutomationPerson': {
+      requireSystemCreds('updateAutomationPerson');
       const { id, ...body } = args;
       const response = await fubApi.put(`/automationsPeople/${id}`, body);
       return response.data;
@@ -2846,6 +2868,7 @@ async function handleToolCall(name, rawArgs) {
 
     // ==================== DEAL ATTACHMENTS ====================
     case 'createDealAttachment': {
+      requireSystemCreds('createDealAttachment');
       const response = await fubApi.post('/dealAttachments', args);
       return response.data;
     }
