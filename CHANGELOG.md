@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## v1.1.3 — 2026-05-12
 
+### ⚠️ IMPORTANT — TOS notice for the new `FUB_SYSTEM` / `FUB_SYSTEM_KEY` env vars
+
+This release introduces support for FUB's `X-System` / `X-System-Key` headers via two new optional env vars, `FUB_SYSTEM` and `FUB_SYSTEM_KEY`. These unlock the "Restricted - Registered Systems Only" endpoints (webhooks, inbox apps, automations 2.0, text-message logging, attachments).
+
+**These credentials are issued by Follow Up Boss to approved third-party integration partners.** Using credentials you did not personally receive from FUB to access restricted endpoints may violate FUB's Terms of Service and could result in account suspension or banning. If you don't have your own legitimate registered-system credentials, leave the env vars unset and use only the unrestricted 130+ tools. **Use at your own risk.** See README.md for the full warning.
+
+
 ### Fixed (from May 11 systematic audit of all 159 tools)
 
 - **Meta-parameter leak.** The MCP orchestration param `wait_for_previous` (and other `_meta` / `__mcp` / `__progressToken` keys) was being passed straight through to the FUB API body, which then returned `400 Invalid fields in the request body`. Added a `stripMetaParams` sanitizer at the top of `handleToolCall` so any MCP-host-injected meta keys are dropped before the request hits FUB.

@@ -19,6 +19,23 @@
 
 > **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. **Strongly recommended: back up your FUB data before turning this loose, unless you really know what you're doing.** Always review AI-suggested actions before confirming changes to live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
 
+> ### ⚠️ READ BEFORE SETTING `FUB_SYSTEM` / `FUB_SYSTEM_KEY` — TOS RISK
+>
+> Several FUB API endpoints are marked **"Restricted - Registered Systems Only"** and require `X-System` + `X-System-Key` headers (this MCP exposes them as `FUB_SYSTEM` + `FUB_SYSTEM_KEY` env vars). These endpoints include: **webhooks, inbox apps, automations (2.0), text-message logging, person/deal attachments.**
+>
+> **These credentials are issued by FUB to approved third-party integration partners — not to end users of FUB.** Setting these env vars is meant for developers who have registered a real third-party app with FUB and received their own dedicated `X-System` name and key.
+>
+> **DO NOT:**
+> - Reuse `X-System` credentials from another app or integration you've found online.
+> - Make up a system name and hope FUB accepts it.
+> - Borrow a partner's credentials.
+>
+> **Doing any of the above to access restricted endpoints may violate Follow Up Boss's Terms of Service and could get your FUB account suspended or banned, with no notice.** FUB's rate-limit + identification policy is documented at https://docs.followupboss.com/reference#identification.
+>
+> If you don't have your own legitimate registered-system credentials, **leave these env vars unset**. The MCP will throw a clear, actionable error on every restricted tool ("requires X-System + X-System-Key …") rather than silently bypassing the gate. The unrestricted 130+ tools all work fine on a regular FUB API key.
+>
+> **Use at your own risk. The authors of this project are not responsible for any TOS violations, account suspensions, bans, or data loss arising from your use of the restricted endpoints.**
+
 > **License note:** This project moved from MIT to **[Elastic License 2.0](LICENSE)** in v1.1.2. You may use, modify, and self-host for your own business at no cost. You may **not** offer it as a hosted/managed service to third parties. For commercial hosting rights, reach out via [neuhausre.com/contact](https://neuhausre.com/contact). Versions ≤ v1.1.1 remain MIT-licensed.
 
 ## What This Does
@@ -30,7 +47,7 @@ This server acts as a bridge between your Follow Up Boss account and AI tools li
 - **Contacts & People** -- Search contacts, create new leads, update stages, manage tags, check duplicates, view relationships
 - **Deals & Pipeline** -- Create and manage deals, move them through pipeline stages, track values and closing dates
 - **Tasks & Appointments** -- Create follow-up tasks, schedule appointments, set reminders, track outcomes
-- **Communication** -- View call logs, text message history, send texts through the API
+- **Communication** -- View call logs and text message history. Note: the API's "create text message" endpoint is log-only (FUB does not deliver SMS via the API); it is also a registered-system-only endpoint — see the warning above.
 - **Email Templates** -- Create, edit, and merge email templates with contact data
 - **Smart Lists & Action Plans** -- View smart lists, assign people to action plans and automations
 - **Custom Fields** -- Create and manage custom fields for contacts and deals
