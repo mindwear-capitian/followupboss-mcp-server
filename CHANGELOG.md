@@ -32,6 +32,18 @@ All notable changes to this project will be documented in this file.
 ### Notes
 - 403 errors on `createTextMessage`, `listAutomations`, `createPersonAttachment`, `createDealAttachment` from the May 11 audit are FUB account-scope issues (feature not enabled or API key lacks scope), not code bugs. The new 403 hint surfaces this directly to the AI client.
 
+### Additional fixes from May 12 end-to-end run (full lifecycle test against live FUB)
+
+- **Placeholder API key sanity check.** If `FUB_API_KEY` is `YOUR_KEY_HERE` / `your_api_key_here` / `placeholder` / `changeme`, the server now exits with a clear error instead of starting and returning 401 on every call. Common cause: an old shell `export` shadows `.env`.
+- **`listTextMessages` description warned about required filter.** FUB rejects unfiltered calls with `400: personId, threadId, phone, toNumber, fromNumber, sharedInboxId, groupTextId, participants, or id list must be specified`. Tool description now states this explicitly and the schema exposes all 9 filter parameters.
+- **`updateAppointment` description warned about start/end.** FUB requires `start` and `end` on every update — even partial edits to title-only. Tool description now tells the AI client to `getAppointment` first and resend both fields.
+- **`listInboxAppInstallations` description noted registration requirement.** On accounts without a registered third-party system (no `FUB_SYSTEM` / `FUB_SYSTEM_KEY`), FUB returns 404. Tool description now explains this so the AI client can interpret the 404 correctly.
+
+### Added (testing)
+
+- **`test-e2e.js` — full lifecycle harness.** Creates a tagged fake person, exercises every safe tool against it (read-only lists, then notes/calls/tasks/appointments/deals/dealCustomFields/relationships, with both canonical and legacy-arg paths for translator-backed tools), then deletes everything created. Explicitly skips all tools that could send (createTextMessage, addPersonToAutomation, addPersonToActionPlan, createEvent, mergeTemplate, etc.), all org-config writes, and all 403-known endpoints. Result on Ed's account: 71 pass, 0 fail, 33 intentional skips. Zero orphan fixtures left behind.
+- **All test scripts now preload `.env` themselves** so a stale parent-shell `FUB_API_KEY` can't shadow the local key.
+
 ## v1.1.2 — 2026-05-06
 
 ### Fixed

@@ -11,9 +11,26 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { readFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(__dirname, 'index.js');
+
+// Preload .env so a stale parent-shell FUB_API_KEY (e.g. "YOUR_KEY_HERE"
+// from a setup wizard) can't shadow the local key.
+function loadDotEnv() {
+  const out = {};
+  try {
+    for (const line of readFileSync(resolve(__dirname, '.env'), 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq > -1) out[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+    }
+  } catch {}
+  return out;
+}
+const DOTENV = loadDotEnv();
 
 let passed = 0;
 let failed = 0;
@@ -37,7 +54,7 @@ async function run() {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [serverPath],
-      env: { ...process.env },
+      env: { ...process.env, ...DOTENV },
     });
     client = new Client({ name: 'fub-test', version: '1.0.0' });
     await client.connect(transport);

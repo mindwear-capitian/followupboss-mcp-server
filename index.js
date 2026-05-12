@@ -57,6 +57,15 @@ if (!FUB_API_KEY) {
   console.error('Run "npm run setup" to configure, or set FUB_API_KEY in your environment.');
   process.exit(1);
 }
+// Catch the classic mistake: a setup wizard or stale shell exported the
+// placeholder string. Without this check the server starts but every API
+// call returns 401 Invalid API Key, which is hard to diagnose.
+if (/^(YOUR_KEY_HERE|your_api_key_here|placeholder|changeme)$/i.test(FUB_API_KEY)) {
+  console.error(`ERROR: FUB_API_KEY is set to a placeholder value ("${FUB_API_KEY}").`);
+  console.error('Set it to a real FUB API key (starts with "fka_") in your .env or MCP host config.');
+  console.error('Note: shell-exported env vars override .env. Unset the placeholder first: `unset FUB_API_KEY`.');
+  process.exit(1);
+}
 
 const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
 const FUB_BASE_URL = 'https://api.followupboss.com/v1';
@@ -684,14 +693,22 @@ const TOOL_DEFINITIONS = [
 // ==================== TEXT MESSAGES ====================
 {
   "name": "listTextMessages",
-  "description": "List text messages",
+  "description": "List text messages. FUB REQUIRES at least one filter: personId, threadId, phone, toNumber, fromNumber, sharedInboxId, groupTextId, participants, or id list. Unfiltered calls return 400.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "limit": { "type": "number", "description": "Maximum number of results to return" },
       "next": { "type": "string", "description": "Cursor for next page of results" },
       "offset": { "type": "number", "description": "Offset for pagination" },
-      "personId": { "type": "number", "description": "Filter by person ID" }
+      "personId": { "type": "number", "description": "Filter by person ID" },
+      "threadId": { "type": "string", "description": "Filter by thread ID" },
+      "phone": { "type": "string", "description": "Filter by phone" },
+      "toNumber": { "type": "string", "description": "Filter by destination number" },
+      "fromNumber": { "type": "string", "description": "Filter by source number" },
+      "sharedInboxId": { "type": "number", "description": "Filter by shared inbox" },
+      "groupTextId": { "type": "number", "description": "Filter by group text" },
+      "participants": { "type": "string", "description": "Comma-separated participants" },
+      "id": { "type": "string", "description": "Comma-separated message IDs" }
     },
     "required": []
   }
@@ -1359,7 +1376,7 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateAppointment",
-  "description": "Update an appointment",
+  "description": "Update an appointment. FUB requires `start` and `end` on EVERY update (even partial edits) or it returns 'Valid Start and End dates are required'. Refetch with getAppointment first if you only have the id.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -2104,7 +2121,7 @@ const TOOL_DEFINITIONS = [
 },
 {
   "name": "listInboxAppInstallations",
-  "description": "List inbox app installations",
+  "description": "List inbox app installations. Requires a registered third-party system (FUB_SYSTEM + FUB_SYSTEM_KEY). On unregistered accounts FUB returns 404 'Requested resource was not found'.",
   "inputSchema": { "type": "object", "properties": {}, "required": [] }
 },
 

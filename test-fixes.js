@@ -16,9 +16,24 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { readFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(__dirname, 'index.js');
+
+function loadDotEnv() {
+  const out = {};
+  try {
+    for (const line of readFileSync(resolve(__dirname, '.env'), 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq > -1) out[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+    }
+  } catch {}
+  return out;
+}
+const DOTENV = loadDotEnv();
 
 let pass = 0, fail = 0;
 const PASS = (l) => { pass++; console.log(`  PASS  ${l}`); };
@@ -41,7 +56,7 @@ async function run() {
   const transport = new StdioClientTransport({
     command: 'node',
     args: [serverPath],
-    env: { ...process.env, FUB_SAFE_MODE: 'true' },
+    env: { ...process.env, ...DOTENV, FUB_SAFE_MODE: 'true' },
   });
   const client = new Client({ name: 'fub-fix-test', version: '1.0.0' });
   await client.connect(transport);
