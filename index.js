@@ -122,7 +122,7 @@ function translateCallArgs(args) {
 }
 
 function translateDealArgs(args) {
-  const { personId, value, ...rest } = args;
+  const { personId, value, agentCommission, teamCommission, ...rest } = args;
   const out = { ...rest };
   if (personId !== undefined && out.peopleIds === undefined) {
     out.peopleIds = Array.isArray(personId) ? personId : [personId];
@@ -130,6 +130,9 @@ function translateDealArgs(args) {
   if (value !== undefined && out.price === undefined) {
     out.price = value;
   }
+  // FUB API typo: stored as agentCommision/teamComission (single 's')
+  if (agentCommission !== undefined) out.agentCommision = agentCommission;
+  if (teamCommission !== undefined) out.teamComission = teamCommission;
   return out;
 }
 
@@ -1724,7 +1727,16 @@ const TOOL_DEFINITIONS = [
       "peopleIds": { "type": "array", "description": "People on deal", "items": { "type": "number" } },
       "userIds": { "type": "array", "description": "User IDs", "items": { "type": "number" } },
       "price": { "type": "number", "description": "Price" },
-      "description": { "type": "string", "description": "Description" }
+      "description": { "type": "string", "description": "Description" },
+      "projectedCloseDate": { "type": "string", "description": "Projected close date (YYYY-MM-DD)" },
+      "commissionValue": { "type": "integer", "description": "Total commission value" },
+      "agentCommission": { "type": "integer", "description": "Agent commission split" },
+      "teamCommission": { "type": "integer", "description": "Team commission split" },
+      "earnestMoneyDueDate": { "type": "string", "description": "Earnest money due date (YYYY-MM-DD)" },
+      "mutualAcceptanceDate": { "type": "string", "description": "Mutual acceptance date (YYYY-MM-DD)" },
+      "dueDiligenceDate": { "type": "string", "description": "Due diligence date (YYYY-MM-DD)" },
+      "finalWalkThroughDate": { "type": "string", "description": "Final walk-through date (YYYY-MM-DD)" },
+      "possessionDate": { "type": "string", "description": "Possession date (YYYY-MM-DD)" }
     },
     "required": ["id"]
   }
