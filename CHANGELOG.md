@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.0 — 2026-05-19
+
+### Added
+
+- **`listNotes` tool.** Read notes with optional `personId` filter, plus `limit` / `offset`. Tool count: 159 → 160 (138 in safe mode). Useful for pulling call transcripts written by Speculo AI or any notes-driven workflow.
+- **Real-estate deal field expansion** on `createDeal` and `updateDeal`:
+  - `projectedCloseDate`
+  - `commissionValue`
+  - `agentCommission` (auto-translated to FUB's `agentCommision` field — note the single-'s' typo on FUB's side)
+  - `teamCommission` (auto-translated to FUB's `teamComission`)
+  - `earnestMoneyDueDate`
+  - `mutualAcceptanceDate`
+  - `dueDiligenceDate`
+  - `finalWalkThroughDate`
+  - `possessionDate`
+
+  `translateDealArgs` extended to handle the two commission-field typos so agents can pass the natural double-'s' spelling.
+
+### Fixed
+
+- **CamelCase collection-key casing on 13 list endpoints.** FUB inconsistently returns lowercase collection keys (e.g. `peoplerelationships`) where handlers were only checking the camelCase form, silently dropping the data array. Added `camelCase || lowercase` fallback for: `peopleRelationships`, `smartLists`, `actionPlans`, `actionPlansPeople`, `automationsPeople`, `textMessageTemplates`, `emEvents`, `emCampaigns`, `customFields`, `appointmentTypes`, `appointmentOutcomes`, `dealCustomFields`, `teamInboxes`.
+- **`listTextMessages`** specifically — same root cause, broken out as its own commit because it was discovered first.
+
+### Credits
+
+Improvements cherry-picked from [tony-dot-sh's fork](https://github.com/tony-dot-sh/followupboss-mcp-server) (MIT-licensed). Original commits preserved with author attribution and cherry-pick trace in git history.
+
+---
+
 ## v1.1.3 — 2026-05-12
 
 ### ⚠️ IMPORTANT — TOS notice for the new `FUB_SYSTEM` / `FUB_SYSTEM_KEY` env vars

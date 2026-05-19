@@ -3,7 +3,7 @@
 /*!
  * Follow Up Boss MCP Server
  *
- * A Model Context Protocol server providing 159 tools for the
+ * A Model Context Protocol server providing 160 tools for the
  * Follow Up Boss CRM API. Self-host for free; ask before reselling.
  *
  * Copyright (c) 2026 Ed Neuhaus / Neuhaus Realty Group, LLC
@@ -234,7 +234,7 @@ function handleApiError(error) {
 }
 
 // ---------------------------------------------------------------------------
-// Tool Definitions (159 tools — 152 core + 5 convenience + 2 meta)
+// Tool Definitions (160 tools — 152 core + 5 convenience + 2 meta)
 // ---------------------------------------------------------------------------
 
 const TOOL_DEFINITIONS = [
@@ -2339,7 +2339,7 @@ async function handleToolCall(name, rawArgs) {
     }
     case 'help': {
       return {
-        server: 'Follow Up Boss MCP Server v1.1.3',
+        server: 'Follow Up Boss MCP Server v1.2.0',
         getting_started: 'Set FUB_API_KEY in your MCP host config (Claude Desktop, Claude Code, Cline, Cursor, etc.). Run `npm run setup` for an interactive wizard.',
         common_examples: [
           '"Show me my smart lists" → listSmartLists ({all: true} to include modern UI lists)',
@@ -3226,7 +3226,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Follow Up Boss MCP Server v1.1.3 started (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
+  console.error(`Follow Up Boss MCP Server v1.2.0 started (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
   console.error(`Built by Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX — https://neuhausre.com`);
   console.error(`Call the 'about' tool for full bio. Call 'help' for usage tips.`);
 }
