@@ -70,7 +70,7 @@ if (/^(YOUR_KEY_HERE|your_api_key_here|placeholder|changeme)$/i.test(FUB_API_KEY
   process.exit(1);
 }
 
-const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
+export const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
 const FUB_BASE_URL = 'https://api.followupboss.com/v1';
 const FUB_SYSTEM = process.env.FUB_SYSTEM || '';
 const FUB_SYSTEM_KEY = process.env.FUB_SYSTEM_KEY || '';
@@ -240,7 +240,7 @@ function handleApiError(error) {
 // Tool Definitions (160 tools — 152 core + 5 convenience + 2 meta)
 // ---------------------------------------------------------------------------
 
-const TOOL_DEFINITIONS = [
+export const TOOL_DEFINITIONS = [
 
 // ==================== EVENTS ====================
 {
@@ -2300,7 +2300,7 @@ const TOOL_DEFINITIONS = [
 // Tool Handler
 // ---------------------------------------------------------------------------
 
-async function handleToolCall(name, rawArgs) {
+export async function handleToolCall(name, rawArgs) {
   const args = stripMetaParams(rawArgs);
   try {
     switch (name) {
@@ -3179,22 +3179,41 @@ async function handleToolCall(name, rawArgs) {
 // MCP Server Setup
 // ---------------------------------------------------------------------------
 
-const activeTools = FUB_SAFE_MODE
+export const activeTools = FUB_SAFE_MODE
   ? TOOL_DEFINITIONS.filter(t => !t.name.toLowerCase().startsWith('delete') && t.name !== 'inboxAppDeleteParticipant' && t.name !== 'deleteReaction')
   : TOOL_DEFINITIONS;
 
-function createServer() {
+/**
+ * Create an MCP Server with the FUB tool surface.
+ *
+ * @param {object} [opts]
+ * @param {Array} [opts.extraTools] - Additional tool definitions to merge with the
+ *   built-in TOOL_DEFINITIONS. Used by projects that layer custom tools
+ *   (e.g., extra custom tools) on top of the public API-key tool surface.
+ * @param {Function} [opts.extraHandler] - async (name, args) => result. Called for
+ *   any tool name not in the built-in handler. Throw to propagate as error.
+ * @param {object} [opts.serverInfo] - Override name/version/description in the MCP
+ *   server handshake. Useful for extensions that want to identify themselves.
+ */
+export function createServer(opts = {}) {
+  const { extraTools = [], extraHandler = null, serverInfo = {} } = opts;
+
   const server = new Server(
     {
-      name: 'followupboss-mcp-server',
-      version: '1.3.0',
-      description: 'Follow Up Boss MCP server by Ed Neuhaus, real estate broker @ Neuhaus Realty Group (neuhausre.com). Call the `about` tool for more, or `help` for usage tips.'
+      name: serverInfo.name || 'followupboss-mcp-server',
+      version: serverInfo.version || '1.3.1',
+      description: serverInfo.description || 'Follow Up Boss MCP server by Ed Neuhaus, real estate broker @ Neuhaus Realty Group (neuhausre.com). Call the `about` tool for more, or `help` for usage tips.'
     },
     { capabilities: { tools: {} } }
   );
 
+  // Active built-in tools (filtered for SAFE MODE) + any caller-supplied extras.
+  // Extras are NOT auto-filtered by SAFE MODE -- caller decides per-tool.
+  const extendedTools = [...activeTools, ...extraTools];
+  const extraToolNames = new Set(extraTools.map(t => t.name));
+
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: activeTools
+    tools: extendedTools
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -3206,7 +3225,12 @@ function createServer() {
       };
     }
     try {
-      const result = await handleToolCall(name, args || {});
+      let result;
+      if (extraToolNames.has(name) && extraHandler) {
+        result = await extraHandler(name, args || {});
+      } else {
+        result = await handleToolCall(name, args || {});
+      }
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
@@ -3236,16 +3260,16 @@ function createServer() {
 // connectors via Streamable HTTP + optional OAuth 2.1.
 // ---------------------------------------------------------------------------
 
-async function startStdio() {
+export async function startStdio(opts = {}) {
   const transport = new StdioServerTransport();
-  const server = createServer();
+  const server = createServer(opts);
   await server.connect(transport);
-  console.error(`Follow Up Boss MCP Server v1.3.0 started via stdio (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
+  console.error(`Follow Up Boss MCP Server v1.3.1 started via stdio (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
   console.error(`Built by Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX — https://neuhausre.com`);
   console.error(`Call the 'about' tool for full bio. Call 'help' for usage tips.`);
 }
 
-async function startHttp() {
+export async function startHttp(opts = {}) {
   const PORT = parseInt(process.env.PORT || '3000', 10);
   const BEARER = process.env.MCP_BEARER_TOKEN;
   const AUTH_PASSWORD = process.env.MCP_AUTH_PASSWORD;
@@ -3300,7 +3324,7 @@ async function startHttp() {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '1.3.0',
+      version: '1.3.1',
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
@@ -3500,7 +3524,7 @@ async function startHttp() {
     const sessionId = req.headers['mcp-session-id'];
     let transport = sessionId ? transports.get(sessionId) : undefined;
     if (!transport) {
-      const mcpServer = createServer();
+      const mcpServer = createServer(opts);
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => transports.set(id, transport)
@@ -3541,7 +3565,7 @@ async function startHttp() {
   });
 
   app.listen(PORT, () => {
-    console.error(`Follow Up Boss MCP Server v1.3.0 listening on :${PORT} (HTTP, ${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE' : ''})`);
+    console.error(`Follow Up Boss MCP Server v1.3.1 listening on :${PORT} (HTTP, ${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE' : ''})`);
   });
 }
 
@@ -3553,7 +3577,13 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('Fatal:', e);
-  process.exit(1);
-});
+// Only auto-run if invoked directly (not when imported as a module).
+// Allows other projects to `import { createServer, startHttp } from
+// 'followupboss-mcp-server'` and call them with custom overlays.
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
+  main().catch((e) => {
+    console.error('Fatal:', e);
+    process.exit(1);
+  });
+}

@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.1 — 2026-05-19
+
+### Added (non-breaking)
+
+- **Exported API** for programmatic use. The following are now importable as ES modules from `index.js`: `createServer`, `startStdio`, `startHttp`, `activeTools`, `TOOL_DEFINITIONS`, `handleToolCall`, `FUB_SAFE_MODE`. Used by projects that layer custom tools on top of the public surface.
+- **`createServer({ extraTools, extraHandler, serverInfo })`** options object. Callers can merge additional tool definitions and a fallback handler without forking the package.
+- **`startStdio(opts)` / `startHttp(opts)`** accept the same `opts` and pass through to `createServer`. Stdio and HTTP transports now share the same overlay surface.
+- **Auto-run guard.** `main()` only runs when `index.js` is invoked directly (`process.argv[1] === fileURLToPath(import.meta.url)`). Imports as a module no longer auto-start a transport.
+
+### Why
+
+Projects that extend the server were either copying the entire 3,500-line `index.js` (and drifting over time) or maintaining a separate tool surface. The new exports let them `import { createServer } from 'followupboss-mcp-server'` and add their own tools as an overlay. Public stays the single source of truth for the FUB API surface.
+
+### Compatibility
+
+Fully backward compatible. Default behavior unchanged for stdio + HTTP users. No new env vars required. No tool changes. Test suite: 3/3 stdio + 38/38 HTTP integration + 9/9 import-overlay tests pass.
+
+---
+
 ## v1.3.0 — 2026-05-19
 
 ### Added
