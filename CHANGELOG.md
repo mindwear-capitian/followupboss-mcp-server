@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.0 — 2026-05-19
+
+### Added
+
+- **HTTP transport.** Set `MCP_TRANSPORT=http` to serve MCP over Streamable HTTP at `/mcp`. Default remains stdio (Claude Desktop). This is what makes Claude.ai web + mobile custom connectors work against this server.
+- **OAuth 2.1 with Dynamic Client Registration + PKCE.** Set `MCP_AUTH_PASSWORD=...` to enable. Claude.ai discovers the auth server via `/.well-known/oauth-authorization-server`, dynamically registers as a client, and walks the user through a password gate to mint a 30-day access token. RFC 7591 + RFC 8414 + RFC 9728 compliant.
+- **Static bearer token mode.** Simpler alternative to OAuth for single-tenant deployments. Set `MCP_BEARER_TOKEN=$(openssl rand -hex 32)` and paste the token into the Claude.ai connector setup as the Authorization header value.
+- **`/health` endpoint** in HTTP mode. Reports version, tool count, safe-mode status, and active auth mode.
+- **Dependencies:** `express` and `@modelcontextprotocol/sdk` Streamable HTTP transport.
+
+### Changed
+
+- `index.js` server setup wrapped in `createServer()` so each HTTP session gets its own MCP Server instance (the SDK only allows one transport per Server). Stdio behavior unchanged for Claude Desktop users.
+
+### Credits
+
+HTTP + OAuth transport pattern ported from [chad778's fork](https://github.com/chad778/followupboss-mcp-server) (MIT-licensed). Original commits: `a960189` (HTTP transport), `9d92318` (optional bearer), `d0ac424` (OAuth 2.1 DCR+PKCE), `2b28e97` (per-session server fix).
+
+---
+
 ## v1.2.0 — 2026-05-19
 
 ### Added
