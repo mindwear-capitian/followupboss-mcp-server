@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.2 — 2026-06-06
+
+### Fixed (bug)
+
+- **`createDeal` / `updateDeal` no longer fail when a commission is set.** The handler used to translate the `agentCommission` / `teamCommission` tool params to the historically-misspelled FUB field names (`agentCommision` / `teamComission`, single `s`). Follow Up Boss has since corrected those field names and now **rejects the misspelled keys with HTTP 400** (`Invalid fields in the request body: agentCommision, teamComission`), so any deal create/update that included a commission hard-failed. The params are now passed straight through with their correct spelling. Verified against the live FUB API on 2026-06-06.
+
+### Compatibility
+
+Fully backward compatible. Tool schemas unchanged (`agentCommission` / `teamCommission` were already the public param names). No env or transport changes.
+
 ## v1.3.1 — 2026-05-19
 
 ### Added (non-breaking)

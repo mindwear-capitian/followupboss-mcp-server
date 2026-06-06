@@ -125,7 +125,7 @@ function translateCallArgs(args) {
 }
 
 function translateDealArgs(args) {
-  const { personId, value, agentCommission, teamCommission, ...rest } = args;
+  const { personId, value, ...rest } = args;
   const out = { ...rest };
   if (personId !== undefined && out.peopleIds === undefined) {
     out.peopleIds = Array.isArray(personId) ? personId : [personId];
@@ -133,9 +133,9 @@ function translateDealArgs(args) {
   if (value !== undefined && out.price === undefined) {
     out.price = value;
   }
-  // FUB API typo: stored as agentCommision/teamComission (single 's')
-  if (agentCommission !== undefined) out.agentCommision = agentCommission;
-  if (teamCommission !== undefined) out.teamComission = teamCommission;
+  // FUB now uses correctly-spelled agentCommission/teamCommission and REJECTS
+  // the old misspelled fields with HTTP 400 (verified live 2026-06-06). Pass
+  // the schema field names straight through unchanged.
   return out;
 }
 
@@ -2309,7 +2309,7 @@ export async function handleToolCall(name, rawArgs) {
     case 'about': {
       return {
         server: 'Follow Up Boss MCP Server',
-        version: '1.1.3',
+        version: '1.3.2',
         author: {
           name: 'Ed Neuhaus',
           title: 'Broker / Owner',
@@ -3324,7 +3324,7 @@ export async function startHttp(opts = {}) {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '1.3.1',
+      version: '1.3.2',
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
