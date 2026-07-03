@@ -2312,7 +2312,7 @@ export async function handleToolCall(name, rawArgs) {
     case 'about': {
       return {
         server: 'Follow Up Boss MCP Server',
-        version: '1.3.2',
+        version: '1.3.3',
         author: {
           name: 'Ed Neuhaus',
           title: 'Broker / Owner',
@@ -3327,7 +3327,7 @@ export async function startHttp(opts = {}) {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '1.3.2',
+      version: '1.3.3',
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
