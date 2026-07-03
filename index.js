@@ -1674,9 +1674,12 @@ export const TOOL_DEFINITIONS = [
       "fields": { "type": "string", "description": "Comma-separated list of fields to return" },
       "id": { "type": "string", "description": "Comma-separated deal IDs" },
       "pipelineId": { "type": "number", "description": "Filter by pipeline" },
-      "stage": { "type": "string", "description": "Filter by stage" },
-      "assignedUserId": { "type": "number", "description": "Filter by assigned user" },
-      "assignedTo": { "type": "string", "description": "Filter by assigned name" }
+      "stageId": { "type": "number", "description": "Filter by stage (numeric stage ID)" },
+      "personId": { "type": "number", "description": "Return deals linked to a specific person" },
+      "userId": { "type": "number", "description": "Return deals assigned to a specific user" },
+      "includeArchived": { "type": "integer", "enum": [0, 1], "description": "Set to 1 to include deals with status Archived (default 0)" },
+      "includeDeleted": { "type": "integer", "enum": [0, 1], "description": "Set to 1 to include deals with status Deleted (default 0)" },
+      "status": { "type": "string", "enum": ["Active", "Archived"], "description": "Only return deals with this status. For deleted deals use includeDeleted=1 (the API's \"Deleted\" value does not filter — it returns all statuses)." }
     },
     "required": []
   }
@@ -2309,7 +2312,7 @@ export async function handleToolCall(name, rawArgs) {
     case 'about': {
       return {
         server: 'Follow Up Boss MCP Server',
-        version: '1.3.2',
+        version: '1.3.3',
         author: {
           name: 'Ed Neuhaus',
           title: 'Broker / Owner',
@@ -3324,7 +3327,7 @@ export async function startHttp(opts = {}) {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '1.3.2',
+      version: '1.3.3',
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.3.3 — 2026-07-03
+
+### Fixed (bug)
+
+- **`listDeals` filter parameters now match the FUB API.** The tool previously exposed `stage`, `assignedUserId`, and `assignedTo` — none of which the FUB `GET /v1/deals` endpoint accepts — so filtering deals by stage or assigned user was silently ignored and returned unfiltered results. Replaced with the real API params: `stageId`, `userId`, `personId`, `includeArchived`, `includeDeleted`, and `status` (`Active` / `Archived`; note that the API's `Deleted` status value does not filter, so `includeDeleted=1` is documented as the way to surface deleted deals). Verified against the live FUB API.
+
+  Thanks to **Tony Greising-Murschel** ([@tony-dot-sh](https://github.com/tony-dot-sh)) for finding and fixing this.
+
+### Compatibility
+
+Backward compatible at the transport level. Any caller that was passing the old `stage` / `assignedUserId` / `assignedTo` params (which never worked) should switch to `stageId` / `userId`.
+
 ## v1.3.2 — 2026-06-06
 
 ### Fixed (bug)
