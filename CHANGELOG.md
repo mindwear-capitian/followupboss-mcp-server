@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.0 — 2026-07-10
+
+### Security
+
+- **Safe Mode is now ON by default (was silently OFF).** `FUB_SAFE_MODE` was
+  evaluated as `=== 'true'`, so an unset or unrecognized value left Safe Mode
+  **off** and exposed all 23 delete tools — while `SECURITY.md`, `README.md`,
+  the `.env.example`, and the in-app `help` tool all stated that Safe Mode was
+  the default. Anyone who set `FUB_API_KEY` directly in an MCP host config (a
+  documented setup path) got an AI agent holding 22 `delete*` tools against a
+  live CRM despite the docs promising deletion was disabled. The flag is now
+  evaluated as `!== 'false'`: unset ⇒ **SAFE**. Opt into Full Access explicitly
+  with `FUB_SAFE_MODE=false`. ([GHSA advisory](../../security/advisories))
+
+- **Safe Mode is now enforced inside `handleToolCall`, the single dispatch
+  choke point.** The guard previously lived only in `createServer`'s
+  `CallToolRequestSchema` handler, so overlays and forks that import and
+  call the exported `handleToolCall` directly received **no** Safe Mode
+  enforcement — a `deletePerson` call would reach the FUB API even with
+  `FUB_SAFE_MODE=true`. The check now runs in `handleToolCall` itself (with the
+  server-handler guard retained as defense-in-depth), and the duplicated
+  delete-tool predicate is consolidated into a single exported `isDeleteTool()`
+  helper.
+
+  Both issues were reported privately and responsibly (no public disclosure) by
+  **Drew Coleman**, broker-owner at Opt Real Estate (Portland, OR) — with exact
+  line references, reproductions, and suggested fixes. Thank you, Drew.
+
+### Fixed (bug)
+
+- **Version banners and metadata now read from `package.json`.** The stdio/HTTP
+  startup banners were hardcoded to `v1.3.1`, and the `about` / `/health`
+  responses to `1.3.3`, drifting from the real package version. All now derive
+  from a single `VERSION` constant.
+
+### Compatibility
+
+- **Behavior change:** if you were relying on delete tools working *without*
+  setting `FUB_SAFE_MODE`, you must now set `FUB_SAFE_MODE=false` explicitly.
+  Existing configs that already set the value either way are unaffected. This is
+  the intended security hardening — deletion is opt-in, not opt-out.
+
+### Security housekeeping
+
+- `npm audit fix` resolved 8 transitive advisories (6 high, 2 moderate;
+  lockfile only, no API surface change). `npm audit` now reports 0
+  vulnerabilities.
+
 ## v1.3.3 — 2026-07-03
 
 ### Fixed (bug)

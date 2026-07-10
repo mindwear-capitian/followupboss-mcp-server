@@ -34,6 +34,7 @@ import { fileURLToPath } from 'url';
 // ---------------------------------------------------------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const VERSION = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version;
 try {
   const envPath = resolve(__dirname, '.env');
   const envContent = readFileSync(envPath, 'utf8');
@@ -70,7 +71,10 @@ if (/^(YOUR_KEY_HERE|your_api_key_here|placeholder|changeme)$/i.test(FUB_API_KEY
   process.exit(1);
 }
 
-export const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE === 'true';
+// Safe Mode is ON unless explicitly disabled. An unset or unrecognized value
+// means SAFE (delete tools blocked) so that a hand-configured install can never
+// silently expose delete tools. Opt into Full Access with FUB_SAFE_MODE=false.
+export const FUB_SAFE_MODE = process.env.FUB_SAFE_MODE !== 'false';
 const FUB_BASE_URL = 'https://api.followupboss.com/v1';
 const FUB_SYSTEM = process.env.FUB_SYSTEM || '';
 const FUB_SYSTEM_KEY = process.env.FUB_SYSTEM_KEY || '';
@@ -2304,6 +2308,12 @@ export const TOOL_DEFINITIONS = [
 // ---------------------------------------------------------------------------
 
 export async function handleToolCall(name, rawArgs) {
+  // Safe Mode enforcement lives HERE, at the single built-in dispatch choke point,
+  // so it protects every caller — including overlays and forks that import
+  // handleToolCall directly and never pass through createServer's request handler.
+  if (FUB_SAFE_MODE && isDeleteTool(name)) {
+    throw new Error('This tool is disabled in Safe Mode. To enable delete operations, set FUB_SAFE_MODE=false.');
+  }
   const args = stripMetaParams(rawArgs);
   try {
     switch (name) {
@@ -2312,7 +2322,7 @@ export async function handleToolCall(name, rawArgs) {
     case 'about': {
       return {
         server: 'Follow Up Boss MCP Server',
-        version: '1.3.3',
+        version: VERSION,
         author: {
           name: 'Ed Neuhaus',
           title: 'Broker / Owner',
@@ -3182,8 +3192,15 @@ export async function handleToolCall(name, rawArgs) {
 // MCP Server Setup
 // ---------------------------------------------------------------------------
 
+// Single source of truth for "is this a destructive delete tool?" — used both to
+// filter the advertised tool surface and to enforce Safe Mode at dispatch time.
+export function isDeleteTool(name) {
+  const n = String(name).toLowerCase();
+  return n.startsWith('delete') || name === 'inboxAppDeleteParticipant' || name === 'deleteReaction';
+}
+
 export const activeTools = FUB_SAFE_MODE
-  ? TOOL_DEFINITIONS.filter(t => !t.name.toLowerCase().startsWith('delete') && t.name !== 'inboxAppDeleteParticipant' && t.name !== 'deleteReaction')
+  ? TOOL_DEFINITIONS.filter(t => !isDeleteTool(t.name))
   : TOOL_DEFINITIONS;
 
 /**
@@ -3204,7 +3221,7 @@ export function createServer(opts = {}) {
   const server = new Server(
     {
       name: serverInfo.name || 'followupboss-mcp-server',
-      version: serverInfo.version || '1.3.1',
+      version: serverInfo.version || VERSION,
       description: serverInfo.description || 'Follow Up Boss MCP server by Ed Neuhaus, real estate broker @ Neuhaus Realty Group (neuhausre.com). Call the `about` tool for more, or `help` for usage tips.'
     },
     { capabilities: { tools: {} } }
@@ -3221,9 +3238,12 @@ export function createServer(opts = {}) {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    if (FUB_SAFE_MODE && (name.toLowerCase().startsWith('delete') || name === 'inboxAppDeleteParticipant' || name === 'deleteReaction')) {
+    // Defense-in-depth: also block here before dispatch. handleToolCall enforces
+    // the same rule for built-ins; this additionally guards the extraHandler path
+    // and returns a clean structured error without invoking the dispatcher.
+    if (FUB_SAFE_MODE && isDeleteTool(name)) {
       return {
-        content: [{ type: 'text', text: JSON.stringify({ error: 'This tool is disabled in Safe Mode. To enable delete operations, set FUB_SAFE_MODE=false or remove it from your config.' }, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify({ error: 'This tool is disabled in Safe Mode. To enable delete operations, set FUB_SAFE_MODE=false.' }, null, 2) }],
         isError: true,
       };
     }
@@ -3267,7 +3287,7 @@ export async function startStdio(opts = {}) {
   const transport = new StdioServerTransport();
   const server = createServer(opts);
   await server.connect(transport);
-  console.error(`Follow Up Boss MCP Server v1.3.1 started via stdio (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
+  console.error(`Follow Up Boss MCP Server v${VERSION} started via stdio (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
   console.error(`Built by Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX — https://neuhausre.com`);
   console.error(`Call the 'about' tool for full bio. Call 'help' for usage tips.`);
 }
@@ -3327,7 +3347,7 @@ export async function startHttp(opts = {}) {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '1.3.3',
+      version: VERSION,
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
@@ -3568,7 +3588,7 @@ export async function startHttp(opts = {}) {
   });
 
   app.listen(PORT, () => {
-    console.error(`Follow Up Boss MCP Server v1.3.1 listening on :${PORT} (HTTP, ${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE' : ''})`);
+    console.error(`Follow Up Boss MCP Server v${VERSION} listening on :${PORT} (HTTP, ${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE' : ''})`);
   });
 }
 
