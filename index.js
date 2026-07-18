@@ -24,7 +24,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
 import express from 'express';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'fs';
 import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -3313,16 +3313,49 @@ export async function startHttp(opts = {}) {
   app.use(express.json({ limit: '4mb' }));
   app.use(express.urlencoded({ extended: false }));
 
-  // In-memory OAuth state. Server restart invalidates everything (re-auth required).
-  const clients = new Map();       // client_id -> { client_secret, redirect_uris, created_at }
-  const authCodes = new Map();     // code       -> { client_id, redirect_uri, code_challenge, expires_at }
-  const accessTokens = new Map();  // token      -> { client_id, expires_at }
+  // OAuth clients + access tokens persist to disk so a server restart
+  // (redeploy, crash, host reboot) does not force every connected client to
+  // re-authenticate. authCodes stay in-memory -- 5-min TTL, losing one
+  // mid-flight just means retry the login, not worth the disk writes.
+  const OAUTH_STORE_PATH = process.env.MCP_OAUTH_STORE_PATH || resolve(__dirname, 'data/oauth-store.json');
+
+  function loadOAuthStore() {
+    try {
+      if (!existsSync(OAUTH_STORE_PATH)) return { clients: {}, accessTokens: {} };
+      const data = JSON.parse(readFileSync(OAUTH_STORE_PATH, 'utf8'));
+      return { clients: data.clients || {}, accessTokens: data.accessTokens || {} };
+    } catch (e) {
+      console.error(`OAuth store at ${OAUTH_STORE_PATH} unreadable, starting empty:`, e.message);
+      return { clients: {}, accessTokens: {} };
+    }
+  }
+
+  function saveOAuthStore() {
+    try {
+      mkdirSync(dirname(OAUTH_STORE_PATH), { recursive: true });
+      const tmpPath = `${OAUTH_STORE_PATH}.tmp`;
+      writeFileSync(tmpPath, JSON.stringify({
+        clients: Object.fromEntries(clients),
+        accessTokens: Object.fromEntries(accessTokens)
+      }));
+      renameSync(tmpPath, OAUTH_STORE_PATH);
+    } catch (e) {
+      console.error(`OAuth store save to ${OAUTH_STORE_PATH} failed:`, e.message);
+    }
+  }
+
+  const oauthStore = loadOAuthStore();
+  const clients = new Map(Object.entries(oauthStore.clients));       // client_id -> { redirect_uris, created_at }
+  const authCodes = new Map();     // code -> { client_id, redirect_uri, code_challenge, expires_at } (in-memory, short TTL)
+  const accessTokens = new Map(Object.entries(oauthStore.accessTokens));  // token -> { client_id, expires_at }
 
   // Periodic cleanup of expired state.
   setInterval(() => {
     const now = Date.now();
+    let accessTokensChanged = false;
     for (const [k, v] of authCodes) if (v.expires_at < now) authCodes.delete(k);
-    for (const [k, v] of accessTokens) if (v.expires_at < now) accessTokens.delete(k);
+    for (const [k, v] of accessTokens) if (v.expires_at < now) { accessTokens.delete(k); accessTokensChanged = true; }
+    if (accessTokensChanged) saveOAuthStore();
   }, 60 * 1000);
 
   function baseUrl(req) {
@@ -3393,6 +3426,7 @@ export async function startHttp(opts = {}) {
     const client_id = randomBytes(16).toString('hex');
     const now = Math.floor(Date.now() / 1000);
     clients.set(client_id, { redirect_uris, created_at: now });
+    saveOAuthStore();
     res.status(201).json({
       client_id,
       client_id_issued_at: now,
@@ -3502,6 +3536,7 @@ export async function startHttp(opts = {}) {
       client_id,
       expires_at: Date.now() + ACCESS_TOKEN_TTL_MS
     });
+    saveOAuthStore();
     res.json({
       access_token,
       token_type: 'Bearer',

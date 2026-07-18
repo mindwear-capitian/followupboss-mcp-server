@@ -324,6 +324,70 @@ fi
 kill $SERVER_PID 2>/dev/null
 wait 2>/dev/null
 
+# --- Section 3: OAuth state survives a server restart ----------------------
+# Regression test for: in-memory client/token registry wiped on every
+# redeploy, forcing every connected client to re-auth (Invalid client_id).
+echo
+echo "===== Section 3: OAuth persistence across restart ====="
+STORE_PATH="/tmp/oauth-store-test-$(date +%s).json"
+rm -f "$STORE_PATH"
+AUTH_PASSWORD="test-pass-restart-$(date +%s)"
+
+MCP_TRANSPORT=http PORT=$PORT MCP_AUTH_PASSWORD="$AUTH_PASSWORD" MCP_OAUTH_STORE_PATH="$STORE_PATH" FUB_API_KEY="$FUB_API_KEY" FUB_SAFE_MODE=true node index.js > /tmp/mcp-restart-1.log 2>&1 &
+SERVER_PID=$!
+sleep 2
+
+# 3.1 Register a client, run full flow to get an access token
+REG_RESP=$(curl -s -X POST "$BASE/oauth/register" -H "Content-Type: application/json" -d '{"redirect_uris":["http://localhost:9999/callback"],"client_name":"restart-test"}')
+CLIENT_ID=$(echo "$REG_RESP" | grep -oE '"client_id":"[a-f0-9]+"' | head -1 | sed 's/.*:"//;s/"$//')
+[ -n "$CLIENT_ID" ] && ok "pre-restart: registered client_id=${CLIENT_ID:0:8}..." || bad "pre-restart register: $REG_RESP"
+
+VERIFIER=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+CHALLENGE=$(node -e "console.log(require('crypto').createHash('sha256').update('$VERIFIER').digest('base64url'))")
+
+REDIR_URL=$(curl -s -o /dev/null -w '%{redirect_url}' -X POST "$BASE/oauth/authorize" -d "client_id=$CLIENT_ID&redirect_uri=http://localhost:9999/callback&state=xyz&code_challenge=$CHALLENGE&password=$AUTH_PASSWORD")
+CODE=$(echo "$REDIR_URL" | grep -oE 'code=[a-f0-9]+' | sed 's/code=//')
+[ -n "$CODE" ] && ok "pre-restart: got auth code" || bad "pre-restart authorize: $REDIR_URL"
+
+TOKEN_RESP=$(curl -s -X POST "$BASE/oauth/token" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=authorization_code&code=$CODE&redirect_uri=http://localhost:9999/callback&client_id=$CLIENT_ID&code_verifier=$VERIFIER")
+ACCESS_TOKEN=$(echo "$TOKEN_RESP" | grep -oE '"access_token":"[a-f0-9]+"' | sed 's/.*:"//;s/"$//')
+[ -n "$ACCESS_TOKEN" ] && ok "pre-restart: got access_token" || bad "pre-restart token: $TOKEN_RESP"
+
+[ -f "$STORE_PATH" ] && ok "store file written to disk at $STORE_PATH" || bad "store file missing after register+token"
+
+# 3.2 Kill the process -- simulates a redeploy/crash/reboot
+kill $SERVER_PID 2>/dev/null
+wait 2>/dev/null
+sleep 1
+
+# 3.3 Start a brand-new process, same store path, NO re-registration
+MCP_TRANSPORT=http PORT=$PORT MCP_AUTH_PASSWORD="$AUTH_PASSWORD" MCP_OAUTH_STORE_PATH="$STORE_PATH" FUB_API_KEY="$FUB_API_KEY" FUB_SAFE_MODE=true node index.js > /tmp/mcp-restart-2.log 2>&1 &
+SERVER_PID=$!
+sleep 2
+
+# 3.4 Old client_id must still be recognized (this is the bug we're fixing --
+# used to fail with 400 'Invalid client_id' here)
+AUTHZ_URL="$BASE/oauth/authorize?client_id=$CLIENT_ID&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=xyz&code_challenge=$CHALLENGE&code_challenge_method=S256&response_type=code"
+FORM=$(curl -s "$AUTHZ_URL")
+if echo "$FORM" | grep -q "Follow Up Boss MCP Authorization" && ! echo "$FORM" | grep -qi "Invalid client_id"; then
+  ok "post-restart: old client_id still recognized (no re-registration needed)"
+else
+  bad "post-restart authorize: $(echo "$FORM" | head -c 200)"
+fi
+
+# 3.5 Old access_token (issued before restart) must still authenticate /mcp
+INIT_RESP=$(curl -s -X POST "$BASE/mcp" -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"restart-test","version":"1"}}}')
+if echo "$INIT_RESP" | grep -q '"serverInfo"'; then
+  ok "post-restart: pre-restart access_token still authenticates /mcp"
+else
+  bad "post-restart token auth: $(echo "$INIT_RESP" | head -c 200)"
+fi
+
+# Cleanup
+kill $SERVER_PID 2>/dev/null
+wait 2>/dev/null
+rm -f "$STORE_PATH" "${STORE_PATH}.tmp"
+
 # --- Summary --------------------------------------------------------------
 echo
 echo "===================================================="

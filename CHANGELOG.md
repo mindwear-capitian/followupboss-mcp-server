@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.1 — 2026-07-18
+
+### Fixed (bug)
+
+- **OAuth client registrations and access tokens no longer die on every
+  restart.** `clients` and `accessTokens` were plain in-memory `Map`s in
+  `startHttp()` -- any process restart (redeploy, crash, host reboot) wiped
+  them, so every previously-authorized Claude.ai/Claude Code connection broke
+  with `Invalid client_id` or `401 unauthorized` on its next request, and
+  had to redo the full DCR + PKCE + password flow. This hit real self-hosted
+  OAuth deployments repeatedly -- three routine redeploys in nine days each
+  silently logged out every connected client.
+
+  Both Maps now persist to a JSON file on disk (plain `fs`, no new
+  dependency), reloaded on boot and rewritten on client registration, token
+  issuance, and expired-token cleanup. `authCodes` (5-minute TTL) intentionally
+  stays in-memory -- losing one mid-flight just means retry the login page,
+  not worth a disk write per auth attempt.
+
+  New optional env var `MCP_OAUTH_STORE_PATH` (default
+  `./data/oauth-store.json`) controls the store location -- **mount a
+  persistent volume at this path in Docker/Railway/Fly deployments**, or the
+  fix does nothing for you (the file dies with the container same as before).
+
+  Added `tests/http-integration.sh` Section 3: registers a client, kills the
+  server process, restarts it against the same store path, and confirms the
+  old client_id and access_token both still work with zero re-registration.
+  Confirmed this section fails against the pre-fix code (`Invalid client_id`,
+  `401 unauthorized`) and passes after.
+
 ## v1.4.0 — 2026-07-10
 
 ### Security
