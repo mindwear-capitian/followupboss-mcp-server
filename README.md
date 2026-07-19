@@ -9,7 +9,7 @@
 - **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile, more on how this one's built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)
 - **[NeuhausRE.com](https://neuhausre.com)** — My brokerage's site, AI-powered home search
 - **[StaySTRA.com](https://staystra.com)** — Short-term rental investment analyzer
-- **[mls.neuhausre.com](https://mls.neuhausre.com)** — MLS MCP server (live MLS data via Claude Desktop)
+- **[Austin MLS MCP](https://github.com/mindwear-capitian/austin-mls-mcp)** — hosted MLS MCP server (live MLS data via Claude, ChatGPT, Perplexity, and more)
 - **[Kendall Creek Properties](https://kendallcreekproperties.com)** — Sister brokerage
 
 ### Want to thank me?
