@@ -6,6 +6,7 @@
 
 ### Other things I'm working on
 
+- **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile, more on how this one's built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)
 - **[NeuhausRE.com](https://neuhausre.com)** — My brokerage's site, AI-powered home search
 - **[StaySTRA.com](https://staystra.com)** — Short-term rental investment analyzer
 - **[mls.neuhausre.com](https://mls.neuhausre.com)** — MLS MCP server (live MLS data via Claude Desktop)
