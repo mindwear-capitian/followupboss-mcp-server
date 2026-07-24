@@ -115,7 +115,8 @@ function stripMetaParams(args) {
 // ---------------------------------------------------------------------------
 
 function translateCallArgs(args) {
-  const { direction, notes, occurredAt, ...rest } = args;
+  // recordingUrl dropped: FUB masks the field on read for every integration, so writing it is a no-op.
+  const { direction, notes, occurredAt, recordingUrl, ...rest } = args;
   const out = { ...rest };
   if (direction !== undefined && out.isIncoming === undefined) {
     const d = String(direction).toLowerCase();
@@ -126,6 +127,15 @@ function translateCallArgs(args) {
   }
   // occurredAt is not in FUB's create-call body; drop it.
   return out;
+}
+
+// FUB returns "* Recording URL is hidden for privacy reasons *" for ALL integrations —
+// they confirmed recording URLs will never be exposed via the API. Replace the mystery
+// string with one that answers the question so users stop asking (issue #2).
+const RECORDING_URL_NOTE = 'Not available: Follow Up Boss does not expose call recording URLs through its API to any integration (confirmed by FUB support). See README.';
+function redactRecordingUrl(call) {
+  if (call && call.recordingUrl) call.recordingUrl = RECORDING_URL_NOTE;
+  return call;
 }
 
 function translateDealArgs(args) {
@@ -684,8 +694,7 @@ export const TOOL_DEFINITIONS = [
       "outcome": { "type": "string", "description": "Call outcome" },
       "userId": { "type": "number", "description": "User who made the call" },
       "toNumber": { "type": "string", "description": "Destination number" },
-      "fromNumber": { "type": "string", "description": "Originating number" },
-      "recordingUrl": { "type": "string", "description": "Recording URL" }
+      "fromNumber": { "type": "string", "description": "Originating number" }
     },
     "required": ["personId"]
   }
@@ -716,8 +725,7 @@ export const TOOL_DEFINITIONS = [
       "note": { "type": "string", "description": "Note" },
       "outcome": { "type": "string", "description": "Outcome" },
       "toNumber": { "type": "string" },
-      "fromNumber": { "type": "string" },
-      "recordingUrl": { "type": "string" }
+      "fromNumber": { "type": "string" }
     },
     "required": ["id"]
   }
@@ -2506,22 +2514,22 @@ export async function handleToolCall(name, rawArgs) {
     // ==================== CALLS ====================
     case 'listCalls': {
       const response = await fubApi.get('/calls', { params: args });
-      return { calls: response.data.calls, _metadata: response.data._metadata };
+      return { calls: (response.data.calls || []).map(redactRecordingUrl), _metadata: response.data._metadata };
     }
     case 'createCall': {
       const body = translateCallArgs(args);
       const response = await fubApi.post('/calls', body);
-      return response.data;
+      return redactRecordingUrl(response.data);
     }
     case 'getCall': {
       const response = await fubApi.get(`/calls/${args.id}`);
-      return response.data;
+      return redactRecordingUrl(response.data);
     }
     case 'updateCall': {
       const { id, ...rest } = args;
       const body = translateCallArgs(rest);
       const response = await fubApi.put(`/calls/${id}`, body);
-      return response.data;
+      return redactRecordingUrl(response.data);
     }
 
     // ==================== TEXT MESSAGES ====================

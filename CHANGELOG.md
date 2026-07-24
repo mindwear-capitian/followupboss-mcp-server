@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.2 — 2026-07-24
+
+### Changed
+
+- **`recordingUrl` now explains itself instead of teasing.** FUB masks call
+  recording URLs at the API level for every integration (`* Recording URL is
+  hidden for privacy reasons *`) and has confirmed they will never be exposed
+  through the API. That mystery string kept generating "can you unhide it?"
+  support questions (issue #2). The call tools (`listCalls`, `getCall`,
+  `createCall`, `updateCall`) now replace any masked value with a note that
+  states the reality and points to the README.
+- **`recordingUrl` removed from `createCall`/`updateCall` inputs.** Verified
+  live: a URL written to a call comes back masked -- writing the field is a
+  black hole. Legacy callers that still send it are silently tolerated
+  (`translateCallArgs` drops it) instead of erroring.
+- README: new FAQ entry "Where are the call recording URLs?"
+
 ## v1.4.1 — 2026-07-18
 
 ### Fixed (bug)

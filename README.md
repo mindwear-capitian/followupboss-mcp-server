@@ -740,6 +740,10 @@ This server is free and open source. You just need a Follow Up Boss account with
 
 Yes, Claude can create, update, and delete records in your FUB account. Claude will typically confirm before making changes, especially for deletions. If you want read-only access, you can create a restricted API key in FUB.
 
+**Where are the call recording URLs?**
+
+Nowhere, and it is not this server hiding them. Follow Up Boss masks `recordingUrl` at the API level for every integration -- the raw API returns `* Recording URL is hidden for privacy reasons *` no matter what headers or permissions you use, and FUB has confirmed directly that recording URLs will never be exposed through the API. Writing a `recordingUrl` is also a no-op (FUB masks it right back on read), so the call tools no longer accept it. If you need call audio, capture it on the dialer side; you can store your transcript on the call with `updateCall` (note field). Full story in [issue #2](https://github.com/mindwear-capitian/followupboss-mcp-server/issues/2).
+
 **What's MCP?**
 
 MCP (Model Context Protocol) is an open standard created by Anthropic that lets AI tools like Claude connect to external services. Think of it as a universal plug that lets Claude talk to your apps. [Learn more about MCP](https://modelcontextprotocol.io/).
