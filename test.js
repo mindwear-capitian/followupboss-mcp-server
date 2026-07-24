@@ -90,10 +90,11 @@ async function run() {
       if (result.isError || data.error || data.status >= 400) {
         fail('Read-only API call', data.error || `HTTP ${data.status}`);
       } else {
-        // FUB identity can return nested or flat -- require a real identifying field
+        // FUB identity can return nested or flat -- require a real identifying field.
+        // Shapes seen in the wild: flat, { identity: {...} }, and { account: { id, domain, owner } }.
         const flat = data.userId || data.id || data.email || data.accountId;
-        const nested = data.identity?.userId || data.identity?.email;
-        const label = data.email || data.identity?.email || data.name || data.identity?.name || 'ok';
+        const nested = data.identity?.userId || data.identity?.email || data.account?.id || data.account?.owner?.email;
+        const label = data.email || data.identity?.email || data.name || data.identity?.name || data.account?.name || 'ok';
         if (flat || nested) {
           ok(`Read-only API call works (account: ${label})`);
         } else {

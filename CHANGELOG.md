@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Fixed (test-only)
+
+- **`npm test` no longer reports a pass on an invalid API key** (PR #4, thanks
+  @drew778) — the read-only check accepted any non-empty object, including FUB's
+  401 error payload. Follow-up: the identity-field check now also accepts the
+  `{ account: { id, domain, owner } }` response shape, which real accounts
+  return and which the PR's stricter check missed.
+
 ## v1.4.2 — 2026-07-24
 
 ### Changed
