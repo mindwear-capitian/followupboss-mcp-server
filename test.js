@@ -85,14 +85,20 @@ async function run() {
     const content = result.content?.[0]?.text;
     if (content) {
       const data = JSON.parse(content);
-      // FUB identity can return nested or flat -- just verify we got real data back
-      const flat = data.userId || data.id || data.email || data.accountId;
-      const nested = data.identity?.userId || data.identity?.email;
-      const label = data.email || data.identity?.email || data.name || data.identity?.name || 'ok';
-      if (flat || nested || Object.keys(data).length > 0) {
-        ok(`Read-only API call works (account: ${label})`);
+      // An error payload is still a non-empty object, so check for it explicitly
+      // before looking at the identity fields.
+      if (result.isError || data.error || data.status >= 400) {
+        fail('Read-only API call', data.error || `HTTP ${data.status}`);
       } else {
-        fail('Read-only API call', 'Empty response');
+        // FUB identity can return nested or flat -- require a real identifying field
+        const flat = data.userId || data.id || data.email || data.accountId;
+        const nested = data.identity?.userId || data.identity?.email;
+        const label = data.email || data.identity?.email || data.name || data.identity?.name || 'ok';
+        if (flat || nested) {
+          ok(`Read-only API call works (account: ${label})`);
+        } else {
+          fail('Read-only API call', `No identity fields in response: ${JSON.stringify(data).slice(0, 120)}`);
+        }
       }
     } else {
       fail('Read-only API call', 'No content returned');
