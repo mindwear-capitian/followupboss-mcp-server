@@ -6,8 +6,24 @@ Thanks for considering a contribution. This is a small project run by a working 
 
 - **Be kind.** This server gets used by real people running real businesses. Don't break their data.
 - **Keep it simple.** This is a single-file MCP server (`index.js`). No build step, no TypeScript. Don't introduce a build system or framework unless there's a really good reason.
-- **License is Elastic License 2.0.** By submitting a PR you agree your contribution is licensed under ELv2 same as the rest of the repo. If you can't agree to that, please don't submit.
+- **License is Elastic License 2.0.** By submitting a PR you agree to the [Contributor license grant](#contributor-license-grant) below. If you can't agree to that, please don't submit.
 - **Attribution is preserved.** Don't strip copyright or NOTICE entries. Add yours alongside if you contribute meaningful code — pile up the credit, don't replace it.
+
+## Contributor license grant
+
+Short version: you keep the copyright on what you write, and I get permission to actually ship it — including in paid or hosted form.
+
+The long version, because it matters and I'd rather be clear than clever:
+
+> By submitting a contribution to this project, you grant Ed Neuhaus (Neuhaus Realty Group LLC) a perpetual, worldwide, non-exclusive, irrevocable, royalty-free license to use, reproduce, modify, adapt, publish, distribute, sublicense, and relicense your contribution, in whole or in part, for any purpose — including commercial use, and including offering it to third parties as a hosted or managed service.
+>
+> You keep your copyright. This is a license, not an assignment. You can still do whatever you want with your own code elsewhere.
+>
+> You confirm the contribution is your original work and that you have the right to grant this license — in particular, that it isn't owned by an employer or covered by an agreement that would prevent you from contributing it.
+>
+> Your contribution is also published to the public under the Elastic License 2.0, same as the rest of the repo.
+
+Why this exists: the repo is ELv2, which stops *anyone* from offering it as a hosted or managed service. Without a separate grant, that same restriction would ride along on contributed code — so a handful of donated lines could block the project's own maintainer from running a hosted version. This paragraph fixes that. Nothing changes for you as a user or a self-hoster: self-hosting is free and always will be.
 
 ## Reporting bugs
 

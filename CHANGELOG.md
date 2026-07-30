@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.4 — 2026-07-30
+
+### Changed (docs / licensing)
+
+- **Contributor license grant added to `CONTRIBUTING.md`.** The old wording was
+  inbound=outbound: contributions came in under ELv2, the same license the repo
+  ships under. That is fine for a permissive license and wrong for a restricted
+  one — ELv2 bars offering the software as a hosted or managed service, so
+  contributed code carried that restriction into the project itself, and donated
+  lines could block the maintainer from running a hosted version.
+- Contributors now keep their copyright and grant the maintainer a perpetual,
+  irrevocable, royalty-free license covering commercial and hosted-service use.
+  Contributions are still published publicly under ELv2.
+- **Self-hosting is unchanged: free, unrestricted, all 160 tools.** This affects
+  contributors only, and only from this release forward.
+- **New `.github/pull_request_template.md`** with sanity-check items and an
+  agreement checkbox, so the grant is acknowledged per PR instead of buried in
+  CONTRIBUTING.
+
+No code changes. `index.js` is byte-identical to v1.4.3.
+
 ## v1.4.3 — 2026-07-24
 
 ### Fixed (test-only)
