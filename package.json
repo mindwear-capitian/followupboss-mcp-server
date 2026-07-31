@@ -1,8 +1,16 @@
 {
   "name": "followupboss-mcp-server",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "A Model Context Protocol (MCP) server for Follow Up Boss CRM by Ed Neuhaus (Neuhaus Realty Group, Austin TX) - 160 tools covering 100% of the official API plus about/help meta tools",
   "type": "module",
+  "files": [
+    "index.js",
+    "setup.js",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "CHANGELOG.md"
+  ],
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

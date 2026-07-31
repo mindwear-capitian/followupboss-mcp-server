@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.4.5 — 2026-07-31
+
+### Changed (packaging)
+
+- **Added a `files` allowlist to `package.json`.** Installs previously shipped
+  everything not gitignored — `test.js`, `test-e2e.js`, `test-fixes.js`,
+  `tests/`, `AUDIT_REPORT.md`, `SECURITY.md`, `CONTRIBUTING.md` — none of which
+  run at runtime. Installed packages now carry only `index.js`, `setup.js`,
+  `README.md`, `LICENSE`, `NOTICE`, and `CHANGELOG.md`.
+- Smaller installs, and the shipped tree now matches what actually executes.
+
+**Cloning from GitHub is unaffected.** `git clone` still gets the full repo
+including every test, and `npm test` works exactly as before. This only changes
+what a packaged install contains.
+
+No code changes. `index.js` is byte-identical to v1.4.3.
+
 ## v1.4.4 — 2026-07-30
 
 ### Changed (docs / licensing)
