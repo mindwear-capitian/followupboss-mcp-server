@@ -134,7 +134,7 @@ You should see:
 
 ```
   PASS  Server starts and MCP handshake succeeds
-  PASS  Lists 134 tools
+  PASS  Lists 137 tools
   PASS  Read-only API call works (account: ok)
 
 3 passed, 0 failed

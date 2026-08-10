@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # A syntactically valid but fake key. index.js refuses to load without one,
+  # and every check below is offline -- no request is ever made to Follow Up
+  # Boss, so CI never needs a real credential.
+  FUB_API_KEY: fka_ci_placeholder
+
+jobs:
+  test:
+    name: test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Safe Mode enforcement
+        run: node tests/safe-mode.mjs
+
+      - name: Import / overlay contract
+        run: node tests/import-overlay.mjs
+
+      - name: Tool count is stable
+        # Guards the numbers published in README.md, package.json and the
+        # GitHub repo description. These drifted apart once already (159 /
+        # 160 / 134 all live at the same time); this makes them self-checking.
+        #   TOOL_DEFINITIONS = every tool that exists
+        #   activeTools      = what is advertised with Safe Mode on (deletes hidden)
+        run: |
+          node -e '
+            import("./index.js").then(m => {
+              const total = m.TOOL_DEFINITIONS.length;
+              const active = m.activeTools.length;
+              const EXPECTED_TOTAL = 160;
+              const EXPECTED_ACTIVE = 137;
+              let bad = false;
+              if (total !== EXPECTED_TOTAL) {
+                console.error(`TOOL_DEFINITIONS is ${total}, expected ${EXPECTED_TOTAL}.`);
+                bad = true;
+              }
+              if (active !== EXPECTED_ACTIVE) {
+                console.error(`activeTools (Safe Mode) is ${active}, expected ${EXPECTED_ACTIVE}.`);
+                bad = true;
+              }
+              if (bad) {
+                console.error("Tool count changed. Update README.md, package.json, the repo description, and the expected values in .github/workflows/ci.yml.");
+                process.exit(1);
+              }
+              console.log(`Tool counts OK: ${total} total, ${active} advertised in Safe Mode.`);
+            }).catch(e => { console.error(e); process.exit(1); });
+          '
+
+      - name: MCP handshake (initialize + tools/list)
+        # Boots the real server over stdio and drives the actual MCP protocol,
+        # so a broken registration or malformed schema fails here rather than
+        # in someone else's Claude Desktop.
+        run: |
+          set -e
+          OUTPUT=$(timeout 20s node -e '
+            const { spawn } = require("node:child_process");
+            const srv = spawn("node", ["index.js"], { stdio: ["pipe", "pipe", "inherit"] });
+            let buf = "";
+            srv.stdout.on("data", c => buf += c.toString());
+            const send = m => srv.stdin.write(JSON.stringify(m) + "\n");
+            send({ jsonrpc:"2.0", id:1, method:"initialize", params:{ protocolVersion:"2024-11-05", capabilities:{}, clientInfo:{name:"ci",version:"0"} } });
+            setTimeout(() => {
+              send({ jsonrpc:"2.0", method:"notifications/initialized", params:{} });
+              send({ jsonrpc:"2.0", id:2, method:"tools/list", params:{} });
+              setTimeout(() => {
+                process.stdout.write(buf);
+                srv.kill();
+                process.exit(0);
+              }, 1200);
+            }, 400);
+          ')
+          echo "$OUTPUT" | grep -q '"tools"' || (echo "tools/list response missing" && exit 1)
+          echo "$OUTPUT" | grep -q '"serverInfo"' || (echo "initialize response missing" && exit 1)
+          echo "Handshake OK."

@@ -15,7 +15,8 @@
   "scripts": {
     "start": "node index.js",
     "setup": "node setup.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "test:offline": "node tests/safe-mode.mjs && node tests/import-overlay.mjs"
   },
   "keywords": [
     "mcp",

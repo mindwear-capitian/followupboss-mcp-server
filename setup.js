@@ -94,7 +94,7 @@ async function main() {
   console.log('     Delete tools are DISABLED. Nothing can be deleted.');
   console.log('');
   console.log('  2. Full Access');
-  console.log('     All 152 tools enabled, including delete operations.');
+  console.log('     All 160 tools enabled, including delete operations.');
   console.log('     Use with caution -- AI can delete contacts, deals, etc.');
   console.log('');
   const modeChoice = await ask('Enter 1 or 2 (default: 1): ');
