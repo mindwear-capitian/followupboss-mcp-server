@@ -55,7 +55,7 @@
     "url": "https://github.com/mindwear-capitian/followupboss-mcp-server/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.6.0",
     "express": "^4.18.2"
   },
