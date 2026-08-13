@@ -1,0 +1,89 @@
+{
+  "manifest_version": "0.3",
+  "name": "followupboss-mcp-server",
+  "display_name": "Follow Up Boss",
+  "version": "1.5.0",
+  "description": "Talk to your Follow Up Boss CRM in plain English. 160 tools covering the full API.",
+  "long_description": "A Model Context Protocol server for the Follow Up Boss CRM, built by a working Austin real estate broker.\n\nCovers 100% of the official Follow Up Boss API across 160 tools — people, deals, tasks, appointments, calls, texts, notes, pipelines, stages, smart lists, templates, webhooks, and more.\n\n**You supply your own Follow Up Boss API key.** It is stored by Claude Desktop, passed to the server on your own machine, and never sent anywhere else. Nothing runs on the author's infrastructure.\n\n**Safe Mode is on by default**, which hides all 23 delete tools and leaves 137 available. Turn it off only if you genuinely need destructive operations.\n\nSome Follow Up Boss endpoints are marked \"Restricted — Registered Systems Only\" and additionally require your own registered system name and key. Those are optional; leave them blank and the remaining tools work normally.",
+  "author": {
+    "name": "Ed Neuhaus",
+    "url": "https://neuhausre.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mindwear-capitian/followupboss-mcp-server.git"
+  },
+  "homepage": "https://github.com/mindwear-capitian/followupboss-mcp-server",
+  "documentation": "https://github.com/mindwear-capitian/followupboss-mcp-server#readme",
+  "support": "https://github.com/mindwear-capitian/followupboss-mcp-server/issues",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "follow-up-boss",
+    "fub",
+    "crm",
+    "real-estate",
+    "realtor",
+    "sales",
+    "lead-management"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/index.js"],
+      "env": {
+        "FUB_API_KEY": "${user_config.fub_api_key}",
+        "FUB_SAFE_MODE": "${user_config.safe_mode}",
+        "FUB_SYSTEM": "${user_config.fub_system}",
+        "FUB_SYSTEM_KEY": "${user_config.fub_system_key}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "tools": [
+    { "name": "listPeople", "description": "List and filter contacts in your Follow Up Boss account" },
+    { "name": "createPerson", "description": "Create a new contact" },
+    { "name": "updatePerson", "description": "Update an existing contact" },
+    { "name": "listDeals", "description": "List deals across your pipelines" },
+    { "name": "createTask", "description": "Create a task for a contact" },
+    { "name": "createNote", "description": "Add a note to a contact's timeline" },
+    { "name": "listAppointments", "description": "List appointments" },
+    { "name": "searchPeopleByTag", "description": "Find contacts carrying a given tag" }
+  ],
+  "user_config": {
+    "fub_api_key": {
+      "type": "string",
+      "title": "Follow Up Boss API Key",
+      "description": "Your own API key. In Follow Up Boss go to Admin > API, then create a key. It stays on this machine.",
+      "sensitive": true,
+      "required": true
+    },
+    "safe_mode": {
+      "type": "boolean",
+      "title": "Safe Mode",
+      "description": "Leave on to hide all 23 delete tools (137 of 160 remain). Turn off only if you need to delete records.",
+      "default": true,
+      "required": false
+    },
+    "fub_system": {
+      "type": "string",
+      "title": "Registered System Name (optional)",
+      "description": "Only needed for endpoints Follow Up Boss marks \"Restricted - Registered Systems Only\", such as webhooks. Register your own at docs.followupboss.com/reference#identification.",
+      "required": false
+    },
+    "fub_system_key": {
+      "type": "string",
+      "title": "Registered System Key (optional)",
+      "description": "The key issued to you with the system name above. Leave blank unless you registered your own system.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
