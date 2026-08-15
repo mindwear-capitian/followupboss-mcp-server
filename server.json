@@ -14,7 +14,7 @@
       "registryType": "mcpb",
       "identifier": "https://github.com/mindwear-capitian/followupboss-mcp-server/releases/download/v1.5.1/followupboss-mcp-server-1.5.1.mcpb",
       "version": "1.5.1",
-      "fileSha256": "3f69751801e4bae7fd41f61102ebf4731008f3cd1740bbc1ce981d3a95506d5b",
+      "fileSha256": "7d10d66610e66754ddec076c8d23d04ed5960d23172e0f45367cf7f46e35a9fc",
       "transport": {
         "type": "stdio"
       }
