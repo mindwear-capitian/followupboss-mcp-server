@@ -3,7 +3,7 @@
   "name": "com.neuhausre/followupboss",
   "title": "Follow Up Boss",
   "description": "Follow Up Boss CRM in plain English. 160 tools; bring your own API key.",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "websiteUrl": "https://neuhausre.com/fub-mcp/",
   "repository": {
     "url": "https://github.com/mindwear-capitian/followupboss-mcp-server",
@@ -12,8 +12,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/mindwear-capitian/followupboss-mcp-server/releases/download/v1.5.0/followupboss-mcp-server-1.5.0.mcpb",
-      "version": "1.5.0",
+      "identifier": "https://github.com/mindwear-capitian/followupboss-mcp-server/releases/download/v1.5.1/followupboss-mcp-server-1.5.1.mcpb",
+      "version": "1.5.1",
       "fileSha256": "3f69751801e4bae7fd41f61102ebf4731008f3cd1740bbc1ce981d3a95506d5b",
       "transport": {
         "type": "stdio"

@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.1 — 2026-08-15
+
+### Fixed
+
+- **Custom fields are now documented on person tools** (closes #10). The FUB API
+  has always accepted custom fields as top-level keys prefixed with `custom`
+  (e.g. `customClosingDate`) on person create/update, and the server always
+  passed them through — but the tool descriptions never said so, so AI clients
+  reported that custom fields could not be imported. `createPerson`,
+  `updatePerson`, `bulkUpdatePeople`, and `getPerson` now spell out how to read,
+  write, and clear custom fields.
+- **`listCustomFields` and `listDealCustomFields` were capped at 10 results.**
+  Neither passed pagination parameters to the API, so accounts with more than
+  10 custom fields could never see the full list. Both now accept `limit` and
+  `offset` (pass `limit=100` to fetch all).
+
+## v1.5.0 — 2026-08-13
+
+### Added
+
+- MCPB desktop bundle for one-click install into Claude Desktop, published as a
+  GitHub release asset and listed on the official MCP Registry as
+  `com.neuhausre/followupboss`.
+
 ## v1.4.5 — 2026-07-31
 
 ### Changed (packaging)

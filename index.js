@@ -350,7 +350,7 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "createPerson",
-  "description": "Create a new person/contact in FUB",
+  "description": "Create a new person/contact in FUB. Custom fields are supported: include them as additional top-level keys prefixed with 'custom' (e.g. customClosingDate) — run listCustomFields to see this account's field names.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -386,14 +386,14 @@ export const TOOL_DEFINITIONS = [
     "type": "object",
     "properties": {
       "id": { "type": "number", "description": "Person ID" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return" }
+      "fields": { "type": "string", "description": "Comma-separated list of fields to return. Include custom field names (e.g. customClosingDate) to guarantee custom fields appear in the response" }
     },
     "required": ["id"]
   }
 },
 {
   "name": "updatePerson",
-  "description": "Update an existing person in FUB",
+  "description": "Update an existing person in FUB. Custom fields are supported: include them as additional top-level keys prefixed with 'custom' (e.g. customClosingDate) — run listCustomFields to see this account's field names. Set a custom field to JSON null to clear it (the string 'null' would be stored literally).",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1197,8 +1197,15 @@ export const TOOL_DEFINITIONS = [
 // ==================== CUSTOM FIELDS ====================
 {
   "name": "listCustomFields",
-  "description": "List all custom fields",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List custom fields. Paginated (FUB defaults to 10 per page) — pass limit=100 to fetch all in one call.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Results per page (FUB default 10, max 100)" },
+      "offset": { "type": "number", "description": "Pagination offset" }
+    },
+    "required": []
+  }
 },
 {
   "name": "createCustomField",
@@ -1827,8 +1834,15 @@ export const TOOL_DEFINITIONS = [
 // ==================== DEAL CUSTOM FIELDS ====================
 {
   "name": "listDealCustomFields",
-  "description": "List deal custom fields",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List deal custom fields. Paginated (FUB defaults to 10 per page) — pass limit=100 to fetch all in one call.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Results per page (FUB default 10, max 100)" },
+      "offset": { "type": "number", "description": "Pagination offset" }
+    },
+    "required": []
+  }
 },
 {
   "name": "createDealCustomField",
@@ -2280,7 +2294,7 @@ export const TOOL_DEFINITIONS = [
     "properties": {
       "ids": { "type": "array", "items": { "type": "number" }, "description": "Array of person IDs to update" },
       "mergeTags": { "type": "boolean", "description": "Merge tags instead of replacing" },
-      "updates": { "type": "object", "description": "Fields to update on each person (same fields as updatePerson: tags, stage, assignedTo, etc.)" }
+      "updates": { "type": "object", "description": "Fields to update on each person (same fields as updatePerson: tags, stage, assignedTo, custom* fields, etc.)" }
     },
     "required": ["ids", "updates"]
   }
@@ -2702,7 +2716,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== CUSTOM FIELDS ====================
     case 'listCustomFields': {
-      const response = await fubApi.get('/customFields');
+      const response = await fubApi.get('/customFields', { params: args });
       return { customFields: response.data.customFields || response.data.customfields, _metadata: response.data._metadata };
     }
     case 'createCustomField': {
@@ -2941,7 +2955,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== DEAL CUSTOM FIELDS ====================
     case 'listDealCustomFields': {
-      const response = await fubApi.get('/dealCustomFields');
+      const response = await fubApi.get('/dealCustomFields', { params: args });
       return { dealCustomFields: response.data.dealCustomFields || response.data.dealcustomfields, _metadata: response.data._metadata };
     }
     case 'createDealCustomField': {
