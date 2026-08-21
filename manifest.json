@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "followupboss-mcp-server",
   "display_name": "Follow Up Boss",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Talk to your Follow Up Boss CRM in plain English. 160 tools covering the full API.",
   "long_description": "A Model Context Protocol server for the Follow Up Boss CRM, built by a working Austin real estate broker.\n\nCovers 100% of the official Follow Up Boss API across 160 tools — people, deals, tasks, appointments, calls, texts, notes, pipelines, stages, smart lists, templates, webhooks, and more.\n\n**You supply your own Follow Up Boss API key.** It is stored by Claude Desktop, passed to the server on your own machine, and never sent anywhere else. Nothing runs on the author's infrastructure.\n\n**Safe Mode is on by default**, which hides all 23 delete tools and leaves 137 available. Turn it off only if you genuinely need destructive operations.\n\nSome Follow Up Boss endpoints are marked \"Restricted — Registered Systems Only\" and additionally require your own registered system name and key. Those are optional; leave them blank and the remaining tools work normally.",
   "author": {
