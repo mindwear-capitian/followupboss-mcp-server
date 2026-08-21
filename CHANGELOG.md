@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.2 — 2026-08-21
+
+### Fixed
+
+- **HTTP-mode server memory grew over time because idle sessions were never
+  evicted.** Scope: server RAM usage only. Each HTTP client session gets its
+  own transport and server instance, held in an in-memory map. The entry was
+  removed only when the client sent an explicit HTTP DELETE — but common MCP
+  clients (Claude Desktop, Claude.ai) abandon sessions on reconnect instead of
+  closing them, so abandoned entries accumulated until process restart.
+  Sessions now expire after 30 minutes of inactivity (tunable via
+  `MCP_SESSION_IDLE_MS`); an expired client transparently re-initializes on
+  its next request. To be explicit about what this is and is not: session
+  objects hold MCP protocol state and tool registrations only. They contain no
+  Follow Up Boss data, no credentials, and nothing user-supplied. No data was
+  exposed, logged, or retained — this fix is resource management (unbounded
+  RAM growth in long-running HTTP deployments), not a data or privacy issue.
+  stdio mode was never affected.
+
+### Added
+
+- `/health` now reports `sessions` (live HTTP session count) so operators can
+  monitor session churn directly instead of inferring it from memory usage.
+
 ## v1.5.1 — 2026-08-15
 
 ### Fixed

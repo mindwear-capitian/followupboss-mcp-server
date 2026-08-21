@@ -3406,6 +3406,7 @@ export async function startHttp(opts = {}) {
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
+      sessions: transports.size,
       ts: new Date().toISOString()
     });
   });
@@ -3600,6 +3601,27 @@ export async function startHttp(opts = {}) {
   // The SDK's Server can only be connected to one transport at a time.
   const transports = new Map(); // sessionId -> transport
 
+  // Idle-session eviction. A client that abandons its session without sending
+  // an HTTP DELETE would otherwise leave its transport (and that session's
+  // per-session server instance) in the map for the life of the process, so
+  // resident memory grows with every abandoned session. Sessions hold MCP
+  // protocol state and tool registrations only — never CRM data — so closing
+  // an idle one is safe: the client transparently re-initializes on its next
+  // request. transport.close() fires onclose, which also deletes the map
+  // entry; the explicit delete here just makes the sweep idempotent.
+  const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS) || 30 * 60 * 1000;
+  const SWEEP_MS = Math.min(5 * 60 * 1000, SESSION_IDLE_MS);
+  const sweeper = setInterval(() => {
+    const cutoff = Date.now() - SESSION_IDLE_MS;
+    for (const [id, t] of transports) {
+      if ((t.lastSeen || 0) < cutoff) {
+        transports.delete(id);
+        try { t.close(); } catch { /* already closed */ }
+      }
+    }
+  }, SWEEP_MS);
+  sweeper.unref();
+
   app.post('/mcp', requireAuth, async (req, res) => {
     const sessionId = req.headers['mcp-session-id'];
     let transport = sessionId ? transports.get(sessionId) : undefined;
@@ -3614,6 +3636,7 @@ export async function startHttp(opts = {}) {
       };
       await mcpServer.connect(transport);
     }
+    transport.lastSeen = Date.now();
     try {
       await transport.handleRequest(req, res, req.body);
     } catch (e) {
@@ -3626,6 +3649,7 @@ export async function startHttp(opts = {}) {
     const sessionId = req.headers['mcp-session-id'];
     const transport = sessionId ? transports.get(sessionId) : undefined;
     if (!transport) return res.status(400).json({ error: 'invalid_session' });
+    transport.lastSeen = Date.now();
     try {
       await transport.handleRequest(req, res);
     } catch (e) {
@@ -3637,6 +3661,7 @@ export async function startHttp(opts = {}) {
     const sessionId = req.headers['mcp-session-id'];
     const transport = sessionId ? transports.get(sessionId) : undefined;
     if (!transport) return res.status(400).json({ error: 'invalid_session' });
+    transport.lastSeen = Date.now();
     try {
       await transport.handleRequest(req, res);
     } catch (e) {
