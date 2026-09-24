@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.5.3 — 2026-09-24
+
+All changes in this release were contributed by **Joe Feser**
+([@joefeser](https://github.com/joefeser)). Thank you, Joe.
+
+### Fixed
+
+- **Safe Mode did not block `inboxAppDeactivate`** (#16). The tool sends an
+  HTTP `DELETE` to `/inboxApps/{id}`, but Safe Mode only matched tools named
+  `delete*`, so it stayed available. It is now blocked and hidden. Safe Mode
+  now exposes 136 of 160 tools (was 137). The docs now state plainly that Safe
+  Mode blocks deletes only; create, update, and bulk-update tools stay enabled.
+- **Failed Follow Up Boss calls looked like successes to the AI client** (#17).
+  API errors were returned as ordinary tool results, so the client could not
+  tell a failed update from a successful one. They are now flagged
+  `isError: true`, as the MCP spec requires. Unknown tool names are flagged the
+  same way. Error text now redacts the API key, the system key, and
+  credential-like fields. Code that imports `handleToolCall` directly gets the
+  same plain-object results as before.
+- **`getPersonByEmail` silently picked one contact when several shared an
+  email** (#18). It now returns `ambiguous: true` with the match count and the
+  candidate IDs and names, so the caller chooses. Zero-match and single-match
+  results are unchanged.
+
+### Security
+
+- Dependency updates: `fast-uri` 3.1.8 (#13, #19), `qs` 6.16.0 with Express
+  4.22.3, with no Express 5 migration (#14, #20), and `hono` 4.13.8 (#15, #21).
+  `npm audit` reports 0 vulnerabilities.
+
 ## v1.5.2 — 2026-08-21
 
 ### Fixed

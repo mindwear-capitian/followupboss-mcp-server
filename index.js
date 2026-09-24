@@ -2408,7 +2408,8 @@ export async function handleToolCall(name, rawArgs) {
         ],
         contributors: {
           'yoship90': 'Smart list API key fix (v1.1.2)',
-          'chad778': 'OAuth + remote transport prototype (in fork chad778/followupboss-mcp-server)'
+          'chad778': 'OAuth + remote transport prototype (in fork chad778/followupboss-mcp-server)',
+          'joefeser': 'Safe Mode, MCP error, and duplicate-email fixes; dependency security updates (v1.5.3)'
         },
         license: 'Elastic License 2.0 — see LICENSE file. Self-host free; commercial hosting/resale requires separate agreement.',
         github: 'https://github.com/mindwear-capitian/followupboss-mcp-server'
