@@ -239,15 +239,54 @@ async function fubApiWithRetry(method, ...methodArgs) {
 // Error handling
 // ---------------------------------------------------------------------------
 
+const TOOL_ERROR = Symbol('toolError');
+
+function redactErrorDetails(value, seen = new WeakSet()) {
+  if (typeof value === 'string') {
+    let redacted = value;
+    for (const secret of [FUB_API_KEY, FUB_SYSTEM_KEY]) {
+      if (secret) redacted = redacted.split(secret).join('[REDACTED]');
+    }
+    return redacted;
+  }
+  if (!value || typeof value !== 'object') return value;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.map(item => redactErrorDetails(item, seen));
+
+  const redacted = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (/(authorization|api[-_]?key|password|token|secret|system[-_]?key)/i.test(key)) {
+      redacted[key] = '[REDACTED]';
+    } else {
+      redacted[key] = redactErrorDetails(item, seen);
+    }
+  }
+  return redacted;
+}
+
+function markToolError(payload) {
+  Object.defineProperty(payload, TOOL_ERROR, { value: true });
+  return payload;
+}
+
+function isToolError(result) {
+  return Boolean(result?.[TOOL_ERROR]);
+}
+
 function handleApiError(error) {
   if (error.response) {
-    return {
+    const payload = {
       error: error.response.data?.errorMessage || error.response.data?.error?.errorMessage || error.message,
       status: error.response.status,
       details: error.response.data
     };
+    if (error.response.status === 403) {
+      payload.hint = 'FUB returned 403 Forbidden. Common causes: (1) feature not enabled on your FUB plan, (2) your API key lacks scope for this resource, (3) action requires account owner permissions. Tools known to require elevated permissions: createTextMessage, listAutomations, createPersonAttachment, createDealAttachment, all webhook tools, and inbox app tools.';
+    }
+    return markToolError(redactErrorDetails(payload));
   }
-  return { error: error.message };
+  return markToolError(redactErrorDetails({ error: error.message }));
 }
 
 // ---------------------------------------------------------------------------
@@ -3203,7 +3242,7 @@ export async function handleToolCall(name, rawArgs) {
     }
 
     default:
-      return { error: `Unknown tool: ${name}` };
+      return markToolError({ error: `Unknown tool: ${name}` });
     }
   } catch (error) {
     return handleApiError(error);
@@ -3280,17 +3319,10 @@ export function createServer(opts = {}) {
       }
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        ...(isToolError(result) ? { isError: true } : {}),
       };
     } catch (error) {
-      const status = error.response?.status;
-      const apiMsg = error.response?.data?.errorMessage
-        || error.response?.data?.error?.errorMessage
-        || error.message;
-      const payload = { error: apiMsg, status };
-      if (status === 403) {
-        payload.hint = 'FUB returned 403 Forbidden. Common causes: (1) feature not enabled on your FUB plan, (2) your API key lacks scope for this resource, (3) action requires account owner permissions. Tools known to require elevated permissions: createTextMessage, listAutomations, createPersonAttachment, createDealAttachment, all webhook tools, and inbox app tools.';
-      }
-      if (error.response?.data) payload.details = error.response.data;
+      const payload = handleApiError(error);
       return {
         content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
         isError: true,

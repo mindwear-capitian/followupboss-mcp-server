@@ -41,6 +41,9 @@ jobs:
       - name: Full Access DELETE dispatch
         run: node tests/full-access.mjs
 
+      - name: MCP error semantics
+        run: node tests/mcp-errors.mjs
+
       - name: Import / overlay contract
         run: node tests/import-overlay.mjs
 
