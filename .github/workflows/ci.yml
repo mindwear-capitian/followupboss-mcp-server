@@ -44,6 +44,9 @@ jobs:
       - name: MCP error semantics
         run: node tests/mcp-errors.mjs
 
+      - name: Email lookup ambiguity
+        run: node tests/email-lookup.mjs
+
       - name: Import / overlay contract
         run: node tests/import-overlay.mjs
 

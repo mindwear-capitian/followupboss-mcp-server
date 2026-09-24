@@ -681,7 +681,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | Tool | Description |
 |------|-------------|
 | `removeTagFromPerson` | Remove a single tag without affecting others (handles read-modify-write internally) |
-| `getPersonByEmail` | Look up a person by email address |
+| `getPersonByEmail` | Look up a person by email; reports ambiguity with candidate IDs instead of silently choosing when multiple contacts match |
 | `searchPeopleByTag` | Find all people with specific tags (comma-separated, OR logic) |
 | `bulkUpdatePeople` | Update multiple people at once with automatic rate limiting |
 | `listAvailableTags` | Discover all tags in your account by scanning contacts |
