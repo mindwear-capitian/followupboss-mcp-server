@@ -2386,7 +2386,7 @@ export async function handleToolCall(name, rawArgs) {
           '"List my open tasks for today" → listTasks',
           '"Tag this contact as Hot Lead" → updatePerson + tag mgmt'
         ],
-        safe_mode: 'FUB_SAFE_MODE=true (default) disables all 23 delete tools. Set to false only if you really need delete operations.',
+        safe_mode: 'FUB_SAFE_MODE=true (default) disables all 24 DELETE-backed tools. Create, update, and bulk-update tools remain enabled. Set to false only if you really need delete operations.',
         bug_reports: 'https://github.com/mindwear-capitian/followupboss-mcp-server/issues',
         feature_requests: 'PRs welcome. Or open an issue.',
         author: 'Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX. Contact: https://neuhausre.com/contact. Real estate referrals from licensed agents in any state are welcome.',
@@ -3218,7 +3218,9 @@ export async function handleToolCall(name, rawArgs) {
 // filter the advertised tool surface and to enforce Safe Mode at dispatch time.
 export function isDeleteTool(name) {
   const n = String(name).toLowerCase();
-  return n.startsWith('delete') || name === 'inboxAppDeleteParticipant' || name === 'deleteReaction';
+  return n.startsWith('delete')
+    || name === 'inboxAppDeleteParticipant'
+    || name === 'inboxAppDeactivate';
 }
 
 export const activeTools = FUB_SAFE_MODE

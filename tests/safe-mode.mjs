@@ -12,12 +12,21 @@
  * Run: node tests/safe-mode.mjs   (no real API key or network needed)
  */
 import assert from 'assert';
+import axios from 'axios';
 
 // A non-placeholder dummy key so the module loads; the guard is checked before
 // any network call, so no real FUB request is ever made by this test.
 process.env.FUB_API_KEY = 'fka_test';
 // Intentionally leave FUB_SAFE_MODE unset — that is the case under test.
 delete process.env.FUB_SAFE_MODE;
+
+let requestCount = 0;
+axios.create = () => new Proxy({}, {
+  get: () => async () => {
+    requestCount++;
+    throw new Error('Safe Mode test attempted an HTTP request');
+  }
+});
 
 const m = await import('../index.js');
 
@@ -26,7 +35,7 @@ assert.strictEqual(m.FUB_SAFE_MODE, true,
   'FUB_SAFE_MODE must default to true (SAFE) when the env var is unset');
 
 // 2. isDeleteTool classifies correctly.
-for (const n of ['deletePerson', 'deleteDeal', 'inboxAppDeleteParticipant', 'deleteReaction'])
+for (const n of ['deletePerson', 'deleteDeal', 'inboxAppDeleteParticipant', 'inboxAppDeactivate', 'deleteReaction'])
   assert.ok(m.isDeleteTool(n), `isDeleteTool('${n}') should be true`);
 for (const n of ['getPerson', 'createPerson', 'updateDeal', 'listPeople'])
   assert.ok(!m.isDeleteTool(n), `isDeleteTool('${n}') should be false`);
@@ -37,9 +46,18 @@ await assert.rejects(
   /disabled in Safe Mode/,
   'handleToolCall must block delete tools in Safe Mode (pre-1.4.0 bypass regression)'
 );
+await assert.rejects(
+  () => m.handleToolCall('inboxAppDeactivate', { id: 1 }),
+  /disabled in Safe Mode/,
+  'inboxAppDeactivate must be blocked because it dispatches HTTP DELETE'
+);
+assert.strictEqual(requestCount, 0,
+  'blocked Safe Mode tools must not attempt an HTTP request');
 
 // 4. Advertised tool surface must not include delete tools in Safe Mode.
 assert.ok(!m.activeTools.some(t => m.isDeleteTool(t.name)),
   'activeTools must not advertise delete tools when Safe Mode is on');
+assert.ok(!m.activeTools.some(t => t.name === 'inboxAppDeactivate'),
+  'activeTools must not advertise inboxAppDeactivate when Safe Mode is on');
 
 console.log(`safe-mode: all checks passed (${m.activeTools.length} tools advertised, deletes hidden)`);

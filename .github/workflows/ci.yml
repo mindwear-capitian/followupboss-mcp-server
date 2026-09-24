@@ -38,6 +38,9 @@ jobs:
       - name: Safe Mode enforcement
         run: node tests/safe-mode.mjs
 
+      - name: Full Access DELETE dispatch
+        run: node tests/full-access.mjs
+
       - name: Import / overlay contract
         run: node tests/import-overlay.mjs
 
@@ -53,7 +56,7 @@ jobs:
               const total = m.TOOL_DEFINITIONS.length;
               const active = m.activeTools.length;
               const EXPECTED_TOTAL = 160;
-              const EXPECTED_ACTIVE = 137;
+              const EXPECTED_ACTIVE = 136;
               let bad = false;
               if (total !== EXPECTED_TOTAL) {
                 console.error(`TOOL_DEFINITIONS is ${total}, expected ${EXPECTED_TOTAL}.`);

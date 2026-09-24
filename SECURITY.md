@@ -40,7 +40,7 @@ I'll acknowledge within 7 days. If the issue is real, I'll work with you on a co
 
 ## Safe mode
 
-The server defaults to `FUB_SAFE_MODE=true` which disables all 23 delete tools at the dispatcher level. If you don't trust the AI to delete things, leave Safe Mode on. We strongly recommend backing up your FUB data before running this against a production CRM, regardless of mode.
+The server defaults to `FUB_SAFE_MODE=true`, which disables all 24 tools that issue HTTP `DELETE` requests at the dispatcher level. This includes inbox app deactivation. Safe Mode does not disable creates, updates, bulk updates, or every operation with consequential effects. We strongly recommend backing up your FUB data before running this against a production CRM, regardless of mode.
 
 ## Responsible disclosure credit
 

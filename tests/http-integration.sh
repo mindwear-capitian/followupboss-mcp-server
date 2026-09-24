@@ -59,16 +59,16 @@ else
   bad "initialize: $(echo "$INIT_RESP" | head -c 200)"
 fi
 
-# 1.5 tools/list returns 137 (safe mode)
+# 1.5 tools/list returns 136 (safe mode)
 TOOLS_RESP=$(curl -s -X POST "$BASE/mcp" \
   -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" -H "Mcp-Session-Id: $SESSION" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
 TOOL_COUNT=$(echo "$TOOLS_RESP" | grep -oE '"name":"[a-zA-Z]+"' | wc -l | tr -d ' ')
-if [ "$TOOL_COUNT" = "137" ]; then
-  ok "tools/list returned 137 tools (safe mode)"
+if [ "$TOOL_COUNT" = "136" ]; then
+  ok "tools/list returned 136 tools (safe mode)"
 else
-  bad "tools/list: expected 137, got $TOOL_COUNT"
+  bad "tools/list: expected 136, got $TOOL_COUNT"
 fi
 
 # 1.6 Call several read-only tools — coverage across domains

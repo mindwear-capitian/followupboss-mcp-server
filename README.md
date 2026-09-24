@@ -118,9 +118,9 @@ This will:
 | Create new records | Yes | Yes |
 | Update existing records | Yes | Yes |
 | **Delete records** | **No** | Yes |
-| Tools available | 137 | 160 |
+| Tools available | 136 | 160 |
 
-**Safe Mode is the default** and recommended for most users. It gives you everything except the ability to delete data. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
+**Safe Mode is the default** and recommended for most users. It disables the 24 tools that issue HTTP `DELETE` requests, including inbox app deactivation. Create, update, and bulk-update tools remain available and can still make consequential changes. You can switch modes at any time by changing `FUB_SAFE_MODE` in your `.env` file or AI tool config.
 
 ### Quick Verify (Optional)
 
