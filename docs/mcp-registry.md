@@ -65,7 +65,7 @@ docs. The key lives only in 1Password (Claude vault, `MCP Registry Signing Key
 
 ## Manifest notes
 
-- `tools_generated: true` — the active tool list depends on Safe Mode, which hides the 23
-  delete tools by default, leaving 137 of 160.
+- `tools_generated: true` — the active tool list depends on Safe Mode, which hides the 24
+  DELETE-backed tools by default, leaving 136 of 160.
 - `FUB_SAFE_MODE` fails safe: the code treats anything other than the exact string `false` as
   safe, so an empty or missing value still blocks deletes.

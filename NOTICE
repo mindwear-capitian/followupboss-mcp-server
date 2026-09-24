@@ -36,6 +36,9 @@ Contributors
   chad778           OAuth 2.1 + DCR + PKCE + HTTP transport prototype
                     Available in fork: chad778/followupboss-mcp-server
 
+  joefeser          Safe Mode inbox-deactivate fix, MCP error semantics,
+                    duplicate-email detection, dependency security updates (v1.5.3)
+
 ================================================================================
 
 Trademarks
