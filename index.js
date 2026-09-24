@@ -2303,7 +2303,7 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "getPersonByEmail",
-  "description": "Look up a person by email address. Returns the first matching contact.",
+  "description": "Look up a person by email address. Returns the contact when the match is unique, or an ambiguity result with candidate IDs when multiple contacts match.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -3191,8 +3191,26 @@ export async function handleToolCall(name, rawArgs) {
       return { success: true, message: `Tag "${args.tag}" removed`, removedTag: args.tag, remainingTags: newTags };
     }
     case 'getPersonByEmail': {
-      const response = await fubApiWithRetry('get', '/people', { params: { email: args.email, limit: 1 } });
+      // Fetch two rows so a full page proves ambiguity without downloading every
+      // duplicate. FUB's collection metadata supplies the complete match count.
+      const response = await fubApiWithRetry('get', '/people', { params: { email: args.email, limit: 2 } });
       const people = response.data.people || [];
+      const metadataTotal = Number(response.data._metadata?.total);
+      const hasTotal = Number.isFinite(metadataTotal);
+      if ((hasTotal && metadataTotal > 1) || people.length > 1) {
+        const matchCount = hasTotal ? metadataTotal : people.length;
+        const candidates = people.map(person => ({
+          id: person.id,
+          ...(person.name ? { name: person.name } : {})
+        }));
+        return {
+          found: false,
+          ambiguous: true,
+          message: `Multiple people found with email ${args.email}; choose a person ID before continuing`,
+          matchCount,
+          candidates
+        };
+      }
       if (people.length === 0) {
         return { found: false, message: `No person found with email ${args.email}` };
       }
