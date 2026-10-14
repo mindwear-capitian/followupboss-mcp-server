@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Bet-your-life HTTP integration tests for v1.3.0.
+# Bet-your-life HTTP integration tests.
 # Tests both bearer auth and full OAuth 2.1 flow against real FUB account.
 # Only READ-ONLY operations + one notes create+delete roundtrip.
+# The transport is stateless (v2.0.0): no Mcp-Session-Id is ever minted.
 #
 # Required env: FUB_API_KEY
-# Optional env: TEST_HOST (default: localhost), TEST_PORT (default: 3999)
+# Optional env: TEST_HOST (default: localhost), TEST_PORT (default: 3999),
+#               SKIP_WRITE=1 skips the notes create+delete roundtrip
 
 set -u
 PASS=0
@@ -113,6 +115,9 @@ else
 fi
 
 # 1.8 Notes roundtrip — write to FUB and clean up
+if [ "${SKIP_WRITE:-}" = "1" ]; then
+  echo "  SKIP  notes roundtrip (SKIP_WRITE=1)"
+else
 # Note: SSE responses wrap FUB JSON in an escaped string. Parse the ESCAPED inner
 # id (\"id\": N) — NOT the outer JSON-RPC envelope id.
 PEOPLE_RESP=$(curl -s -X POST "$BASE/mcp" \
@@ -147,35 +152,24 @@ if [ -n "$NOTE_ID" ]; then
 else
   bad "createNote: $(echo "$NOTE_RESP" | head -c 300)"
 fi
-
-# 1.9 Concurrent sessions — open 2 more, verify they don't interfere
-SESSION2_HDRS=$(curl -s -X POST "$BASE/mcp" \
-  -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -D - \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"sess2","version":"1"}}}')
-SESSION2=$(echo "$SESSION2_HDRS" | grep -i "mcp-session-id" | head -1 | awk '{print $2}' | tr -d '\r')
-
-SESSION3_HDRS=$(curl -s -X POST "$BASE/mcp" \
-  -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -D - \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"sess3","version":"1"}}}')
-SESSION3=$(echo "$SESSION3_HDRS" | grep -i "mcp-session-id" | head -1 | awk '{print $2}' | tr -d '\r')
-
-if [ -n "$SESSION2" ] && [ -n "$SESSION3" ] && [ "$SESSION" != "$SESSION2" ] && [ "$SESSION2" != "$SESSION3" ]; then
-  ok "three concurrent sessions get distinct ids"
-else
-  bad "session ids: 1=$SESSION 2=$SESSION2 3=$SESSION3"
 fi
 
-# 1.10 Each session can still call tools
+# 1.9 Stateless: initialize mints no session id
+if [ -z "$SESSION" ]; then
+  ok "initialize mints no Mcp-Session-Id (stateless)"
+else
+  bad "initialize returned a session id: $SESSION"
+fi
+
+# 1.10 Calls work with no session id at all
 RESP=$(curl -s -X POST "$BASE/mcp" \
   -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -H "Mcp-Session-Id: $SESSION2" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"getIdentity","arguments":{}}}')
 if echo "$RESP" | grep -q 'account'; then
-  ok "session 2 can call tools"
+  ok "tools/call works with no session id"
 else
-  bad "session 2 getIdentity: $(echo "$RESP" | head -c 200)"
+  bad "no-session getIdentity: $(echo "$RESP" | head -c 200)"
 fi
 
 # 1.11 Unknown session ID rejected
@@ -183,12 +177,11 @@ RESP=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/mcp" \
   -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" -H "Mcp-Session-Id: bogus-id-not-real" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
-# StreamableHTTPServerTransport behavior: may auto-create OR may reject. Either is OK
-# as long as it doesn't crash. Just confirm we get a sane HTTP code.
-if [ "$RESP" = "400" ] || [ "$RESP" = "404" ] || [ "$RESP" = "200" ]; then
-  ok "unknown session id handled gracefully (HTTP $RESP)"
+# Stateless: a session id left over from an old server is ignored, not rejected.
+if [ "$RESP" = "200" ]; then
+  ok "stale session id ignored (HTTP 200)"
 else
-  bad "unknown session id: HTTP $RESP"
+  bad "stale session id: HTTP $RESP"
 fi
 
 # Kill bearer server

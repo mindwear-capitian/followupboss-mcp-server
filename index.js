@@ -18,14 +18,13 @@
  * Real estate referral in any state? https://neuhausre.com/contact
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Server, createMcpHandler } from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { toNodeHandler } from '@modelcontextprotocol/node';
 import axios from 'axios';
 import express from 'express';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'fs';
-import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -3306,7 +3305,14 @@ export function createServer(opts = {}) {
       version: serverInfo.version || VERSION,
       description: serverInfo.description || 'Follow Up Boss MCP server by Ed Neuhaus, real estate broker @ Neuhaus Realty Group (neuhausre.com). Call the `about` tool for more, or `help` for usage tips.'
     },
-    { capabilities: { tools: {} } }
+    {
+      capabilities: { tools: {} },
+      // 2026-07-28 cache hints for list results. The tool list only changes on a redeploy.
+      cacheHints: {
+        'tools/list': { ttlMs: 5 * 60 * 1000, cacheScope: 'public' },
+        'server/discover': { ttlMs: 5 * 60 * 1000, cacheScope: 'public' }
+      }
+    }
   );
 
   // Active built-in tools (filtered for SAFE MODE) + any caller-supplied extras.
@@ -3314,11 +3320,11 @@ export function createServer(opts = {}) {
   const extendedTools = [...activeTools, ...extraTools];
   const extraToolNames = new Set(extraTools.map(t => t.name));
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  server.setRequestHandler('tools/list', async () => ({
     tools: extendedTools
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler('tools/call', async (request) => {
     const { name, arguments: args } = request.params;
     // Defense-in-depth: also block here before dispatch. handleToolCall enforces
     // the same rule for built-ins; this additionally guards the extraHandler path
@@ -3359,9 +3365,8 @@ export function createServer(opts = {}) {
 // ---------------------------------------------------------------------------
 
 export async function startStdio(opts = {}) {
-  const transport = new StdioServerTransport();
-  const server = createServer(opts);
-  await server.connect(transport);
+  // serveStdio answers both 2025-era (initialize) and 2026-07-28 clients.
+  await serveStdio(() => createServer(opts));
   console.error(`Follow Up Boss MCP Server v${VERSION} started via stdio (${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE — delete tools disabled' : ''})`);
   console.error(`Built by Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX — https://neuhausre.com`);
   console.error(`Call the 'about' tool for full bio. Call 'help' for usage tips.`);
@@ -3373,6 +3378,7 @@ export async function startHttp(opts = {}) {
   const AUTH_PASSWORD = process.env.MCP_AUTH_PASSWORD;
   const AUTH_DISABLED = process.env.MCP_AUTH_DISABLED === 'true' || (!BEARER && !AUTH_PASSWORD);
   const OAUTH_ENABLED = !!AUTH_PASSWORD && !AUTH_DISABLED;
+  const LEGACY_MODE = process.env.MCP_LEGACY === 'reject' ? 'reject' : 'stateless';
   const ACCESS_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   const AUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -3459,7 +3465,8 @@ export async function startHttp(opts = {}) {
       tools: activeTools.length,
       safeMode: FUB_SAFE_MODE,
       authMode: AUTH_DISABLED ? 'none' : (OAUTH_ENABLED ? 'oauth2.1' : 'bearer'),
-      sessions: transports.size,
+      transport: 'stateless',
+      protocolEras: LEGACY_MODE === 'reject' ? ['modern'] : ['modern', 'legacy'],
       ts: new Date().toISOString()
     });
   });
@@ -3650,77 +3657,52 @@ export async function startHttp(opts = {}) {
     next();
   };
 
-  // Stateful transport: each session gets its own transport + server instance.
-  // The SDK's Server can only be connected to one transport at a time.
-  const transports = new Map(); // sessionId -> transport
-
-  // Idle-session eviction. A client that abandons its session without sending
-  // an HTTP DELETE would otherwise leave its transport (and that session's
-  // per-session server instance) in the map for the life of the process, so
-  // resident memory grows with every abandoned session. Sessions hold MCP
-  // protocol state and tool registrations only — never CRM data — so closing
-  // an idle one is safe: the client transparently re-initializes on its next
-  // request. transport.close() fires onclose, which also deletes the map
-  // entry; the explicit delete here just makes the sweep idempotent.
-  const SESSION_IDLE_MS = Number(process.env.MCP_SESSION_IDLE_MS) || 30 * 60 * 1000;
-  const SWEEP_MS = Math.min(5 * 60 * 1000, SESSION_IDLE_MS);
-  const sweeper = setInterval(() => {
-    const cutoff = Date.now() - SESSION_IDLE_MS;
-    for (const [id, t] of transports) {
-      if ((t.lastSeen || 0) < cutoff) {
-        transports.delete(id);
-        try { t.close(); } catch { /* already closed */ }
-      }
-    }
-  }, SWEEP_MS);
-  sweeper.unref();
-
-  app.post('/mcp', requireAuth, async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'];
-    let transport = sessionId ? transports.get(sessionId) : undefined;
-    if (!transport) {
-      const mcpServer = createServer(opts);
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id) => transports.set(id, transport)
-      });
-      transport.onclose = () => {
-        if (transport.sessionId) transports.delete(transport.sessionId);
-      };
-      await mcpServer.connect(transport);
-    }
-    transport.lastSeen = Date.now();
-    try {
-      await transport.handleRequest(req, res, req.body);
-    } catch (e) {
-      console.error('MCP POST error', e);
-      if (!res.headersSent) res.status(500).json({ error: 'transport_error' });
-    }
+  // Stateless transport. Every POST gets a fresh server from createServer();
+  // nothing is kept between requests, so a restart drops nothing.
+  // 2026-07-28 clients send per-request _meta and are served as modern.
+  // 2025-era clients (initialize) are served stateless with no session id,
+  // unless MCP_LEGACY=reject turns this into a modern-only endpoint.
+  const mcpHandler = createMcpHandler(() => createServer(opts), {
+    legacy: LEGACY_MODE,
+    onerror: (e) => console.error('MCP error:', e.message)
+  });
+  const nodeHandler = toNodeHandler(mcpHandler, {
+    onerror: (e) => console.error('MCP adapter error:', e.message)
   });
 
-  app.get('/mcp', requireAuth, async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'];
-    const transport = sessionId ? transports.get(sessionId) : undefined;
-    if (!transport) return res.status(400).json({ error: 'invalid_session' });
-    transport.lastSeen = Date.now();
+  // Origin check (spec MUST). Server-side clients send no Origin; a browser
+  // Origin must be on the allowlist, else 403.
+  const ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS || 'claude.ai,claude.com')
+    .split(',').map(h => h.trim()).filter(Boolean);
+  const originGuard = (req, res, next) => {
+    const origin = req.headers['origin'];
+    if (!origin) return next();
     try {
-      await transport.handleRequest(req, res);
-    } catch (e) {
-      console.error('MCP GET error', e);
-    }
-  });
+      if (ALLOWED_ORIGINS.includes(new URL(origin).hostname)) return next();
+    } catch { /* malformed Origin falls through to 403 */ }
+    res.status(403).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Origin not allowed' } });
+  };
 
-  app.delete('/mcp', requireAuth, async (req, res) => {
-    const sessionId = req.headers['mcp-session-id'];
-    const transport = sessionId ? transports.get(sessionId) : undefined;
-    if (!transport) return res.status(400).json({ error: 'invalid_session' });
-    transport.lastSeen = Date.now();
-    try {
-      await transport.handleRequest(req, res);
-    } catch (e) {
-      console.error('MCP DELETE error', e);
+  // Logs the protocol era of each request, so you can see when no 2025-era
+  // client is left and MCP_LEGACY=reject is safe. MCP_LOG_ERA=false silences it.
+  const logEra = (req, _res, next) => {
+    if (process.env.MCP_LOG_ERA !== 'false') {
+      const meta = req.body?.params?._meta;
+      const modern = !!(meta && meta['io.modelcontextprotocol/protocolVersion']);
+      console.error(`mcp era=${modern ? 'modern' : 'legacy'} method=${req.body?.method || '?'} ua="${req.headers['user-agent'] || ''}"`);
     }
-  });
+    next();
+  };
+
+  app.post('/mcp', originGuard, requireAuth, logEra, (req, res) => nodeHandler(req, res, req.body));
+
+  // No sessions, so no SSE stream to open and nothing to delete.
+  const methodNotAllowed = (_req, res) => {
+    res.set('Allow', 'POST');
+    res.status(405).json({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method not allowed.' } });
+  };
+  app.get('/mcp', methodNotAllowed);
+  app.delete('/mcp', methodNotAllowed);
 
   app.listen(PORT, () => {
     console.error(`Follow Up Boss MCP Server v${VERSION} listening on :${PORT} (HTTP, ${activeTools.length} tools${FUB_SAFE_MODE ? ', SAFE MODE' : ''})`);

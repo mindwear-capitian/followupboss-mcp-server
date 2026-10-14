@@ -5,8 +5,7 @@
  */
 import assert from 'assert';
 import axios from 'axios';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 
 const API_KEY = 'fka_test_secret_value';
 process.env.FUB_API_KEY = API_KEY;
