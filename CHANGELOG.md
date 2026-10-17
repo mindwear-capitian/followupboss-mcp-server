@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased (v2.0.0)
+
+### Fixed
+
+- **11 list tools returned only the first 10 rows.** `listStages`,
+  `listPipelines`, `listPonds`, `listGroups`, `listTeams`, `listTeamInboxes`,
+  `listWebhooks`, `listAppointmentTypes`, `listAppointmentOutcomes`,
+  `listTimeframes` and `listInboxAppInstallations` sent no paging inputs, so
+  FUB's default page of 10 was all an agent could see. They now accept
+  `limit`, `offset` and `next`, and default to 100 rows.
+- **`listPeople` inputs were undocumented.** `sort` lists the valid fields
+  (FUB silently ignores an unknown one), `stage` says it takes a stage name,
+  not an ID.
+- **`help` reported v1.2.0.** It now reads the version from `package.json`
+  and lists the input rules for paging, sorting, stages and fields.
+
 ## v1.5.3 — 2026-09-24
 
 All changes in this release were contributed by **Joe Feser**

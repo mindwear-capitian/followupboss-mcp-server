@@ -356,8 +356,8 @@ export const TOOL_DEFINITIONS = [
     "type": "object",
     "properties": {
       "id": { "type": "string", "description": "Comma-separated person IDs" },
-      "sort": { "type": "string", "description": "Sort order" },
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
+      "sort": { "type": "string", "description": "Field to sort by (default created). Prefix with - for newest/highest first, e.g. -lastActivity. Valid: id, created, updated, name, firstName, lastName, price, stage, lastActivity, lastCommunication, lastReceivedEmail, lastSentEmail, lastEmail, emailsReceived, emailsSent, lastIncomingCall, lastOutgoingCall, lastCall, firstCall, callsIncoming, callsOutgoing, callsDuration, lastReceivedText, lastSentText, lastText, lastLeadActivity, lastEmEventActivity, lastIdxVisit, textsReceived, textsSent, propertiesViewed, propertiesSaved, pagesViewed, nextTask, or a custom field (e.g. customClosePrice). FUB silently ignores an unknown name and uses the default order." },
+      "limit": { "type": "number", "description": "Max results per call (default 10, max 100)" },
       "offset": { "type": "number", "description": "Offset for pagination" },
       "next": { "type": "string", "description": "Cursor for next page of results" },
       "fields": { "type": "string", "description": "Comma-separated list of fields to return" },
@@ -368,8 +368,8 @@ export const TOOL_DEFINITIONS = [
       "lastName": { "type": "string", "description": "Filter by last name" },
       "email": { "type": "string", "description": "Filter by email" },
       "phone": { "type": "string", "description": "Filter by phone" },
-      "stage": { "type": "string", "description": "Filter by stage" },
-      "source": { "type": "string", "description": "Filter by source" },
+      "stage": { "type": "string", "description": "Stage NAME, not ID (e.g. \"Lead\" or \"Trash\"). Call listStages for this account's stage names." },
+      "source": { "type": "string", "description": "Lead source text, exactly as it appears in the person's source field" },
       "assignedTo": { "type": "string", "description": "Filter by assigned agent name" },
       "assignedUserId": { "type": "number", "description": "Filter by assigned user ID" },
       "assignedPondId": { "type": "number", "description": "Filter by assigned pond ID" },
@@ -1298,8 +1298,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== STAGES ====================
 {
   "name": "listStages",
-  "description": "List all pipeline stages",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all pipeline stages. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createStage",
@@ -1499,8 +1507,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== APPOINTMENT TYPES ====================
 {
   "name": "listAppointmentTypes",
-  "description": "List appointment types",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List appointment types. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createAppointmentType",
@@ -1551,8 +1567,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== APPOINTMENT OUTCOMES ====================
 {
   "name": "listAppointmentOutcomes",
-  "description": "List appointment outcomes",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List appointment outcomes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createAppointmentOutcome",
@@ -1603,8 +1627,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== WEBHOOKS ====================
 {
   "name": "listWebhooks",
-  "description": "List all webhooks",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all webhooks. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createWebhook",
@@ -1668,8 +1700,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== PIPELINES ====================
 {
   "name": "listPipelines",
-  "description": "List all pipelines",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all pipelines. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createPipeline",
@@ -1943,8 +1983,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== GROUPS ====================
 {
   "name": "listGroups",
-  "description": "List all groups",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all groups. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "listRoundRobinGroups",
@@ -2002,8 +2050,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== TEAMS ====================
 {
   "name": "listTeams",
-  "description": "List all teams",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all teams. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createTeam",
@@ -2056,15 +2112,31 @@ export const TOOL_DEFINITIONS = [
 // ==================== TEAM INBOXES ====================
 {
   "name": "listTeamInboxes",
-  "description": "List all team inboxes",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all team inboxes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 
 // ==================== PONDS ====================
 {
   "name": "listPonds",
-  "description": "List all ponds",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all ponds. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 {
   "name": "createPond",
@@ -2115,8 +2187,16 @@ export const TOOL_DEFINITIONS = [
 // ==================== TIMEFRAMES ====================
 {
   "name": "listTimeframes",
-  "description": "List all timeframes",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List all timeframes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 
 // ==================== INBOX APPS ====================
@@ -2230,8 +2310,16 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "listInboxAppInstallations",
-  "description": "List inbox app installations. Requires a registered third-party system (FUB_SYSTEM + FUB_SYSTEM_KEY). On unregistered accounts FUB returns 404 'Requested resource was not found'.",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
+  "description": "List inbox app installations. Requires a registered third-party system (FUB_SYSTEM + FUB_SYSTEM_KEY). On unregistered accounts FUB returns 404 'Requested resource was not found'. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
+      "offset": { "type": "number", "description": "Number of rows to skip" },
+      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+    },
+    "required": []
+  }
 },
 
 // ==================== REACTIONS ====================
@@ -2416,7 +2504,7 @@ export async function handleToolCall(name, rawArgs) {
     }
     case 'help': {
       return {
-        server: 'Follow Up Boss MCP Server v1.2.0',
+        server: `Follow Up Boss MCP Server v${VERSION}`,
         getting_started: 'Set FUB_API_KEY in your MCP host config (Claude Desktop, Claude Code, Cline, Cursor, etc.). Run `npm run setup` for an interactive wizard.',
         common_examples: [
           '"Show me my smart lists" → listSmartLists ({all: true} to include modern UI lists)',
@@ -2424,6 +2512,13 @@ export async function handleToolCall(name, rawArgs) {
           '"Create a deal for the Anderson contact" → createDeal',
           '"List my open tasks for today" → listTasks',
           '"Tag this contact as Hot Lead" → updatePerson + tag mgmt'
+        ],
+        input_rules: [
+          'Paging: list tools return a _metadata block. If _metadata.next is set, there are more rows. Call the same tool again with next=<that value>.',
+          'Page size: limit is max 100. listPeople defaults to 10; most no-filter list tools (listStages, listPipelines, listPonds, ...) default to 100.',
+          'Sorting: sort takes a field name; prefix with - for descending (e.g. -lastActivity). FUB silently ignores an unknown name, so check the tool description for valid values.',
+          'Stages: listPeople stage filter takes the stage NAME (e.g. "Lead"); listDeals stageId takes the numeric ID. Get both from listStages.',
+          'Fields: pass fields=id,name,... to keep responses small; fields=allFields returns everything.'
         ],
         safe_mode: 'FUB_SAFE_MODE=true (default) disables all 24 DELETE-backed tools. Create, update, and bulk-update tools remain enabled. Set to false only if you really need delete operations.',
         bug_reports: 'https://github.com/mindwear-capitian/followupboss-mcp-server/issues',
@@ -2778,7 +2873,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== STAGES ====================
     case 'listStages': {
-      const response = await fubApi.get('/stages');
+      const response = await fubApi.get('/stages', { params: { limit: 100, ...args } });
       return { stages: response.data.stages, _metadata: response.data._metadata };
     }
     case 'createStage': {
@@ -2849,7 +2944,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== APPOINTMENT TYPES ====================
     case 'listAppointmentTypes': {
-      const response = await fubApi.get('/appointmentTypes');
+      const response = await fubApi.get('/appointmentTypes', { params: { limit: 100, ...args } });
       return { appointmentTypes: response.data.appointmentTypes || response.data.appointmenttypes, _metadata: response.data._metadata };
     }
     case 'createAppointmentType': {
@@ -2872,7 +2967,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== APPOINTMENT OUTCOMES ====================
     case 'listAppointmentOutcomes': {
-      const response = await fubApi.get('/appointmentOutcomes');
+      const response = await fubApi.get('/appointmentOutcomes', { params: { limit: 100, ...args } });
       return { appointmentOutcomes: response.data.appointmentOutcomes || response.data.appointmentoutcomes, _metadata: response.data._metadata };
     }
     case 'createAppointmentOutcome': {
@@ -2896,7 +2991,7 @@ export async function handleToolCall(name, rawArgs) {
     // ==================== WEBHOOKS ====================
     case 'listWebhooks': {
       requireWebhookCreds();
-      const response = await fubApi.get('/webhooks');
+      const response = await fubApi.get('/webhooks', { params: { limit: 100, ...args } });
       return { webhooks: response.data.webhooks, _metadata: response.data._metadata };
     }
     case 'createWebhook': {
@@ -2926,7 +3021,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== PIPELINES ====================
     case 'listPipelines': {
-      const response = await fubApi.get('/pipelines');
+      const response = await fubApi.get('/pipelines', { params: { limit: 100, ...args } });
       return { pipelines: response.data.pipelines, _metadata: response.data._metadata };
     }
     case 'createPipeline': {
@@ -3019,7 +3114,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== GROUPS ====================
     case 'listGroups': {
-      const response = await fubApi.get('/groups');
+      const response = await fubApi.get('/groups', { params: { limit: 100, ...args } });
       return { groups: response.data.groups, _metadata: response.data._metadata };
     }
     case 'listRoundRobinGroups': {
@@ -3046,7 +3141,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== TEAMS ====================
     case 'listTeams': {
-      const response = await fubApi.get('/teams');
+      const response = await fubApi.get('/teams', { params: { limit: 100, ...args } });
       return { teams: response.data.teams, _metadata: response.data._metadata };
     }
     case 'createTeam': {
@@ -3069,13 +3164,13 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== TEAM INBOXES ====================
     case 'listTeamInboxes': {
-      const response = await fubApi.get('/teamInboxes');
+      const response = await fubApi.get('/teamInboxes', { params: { limit: 100, ...args } });
       return { teamInboxes: response.data.teamInboxes || response.data.teaminboxes, _metadata: response.data._metadata };
     }
 
     // ==================== PONDS ====================
     case 'listPonds': {
-      const response = await fubApi.get('/ponds');
+      const response = await fubApi.get('/ponds', { params: { limit: 100, ...args } });
       return { ponds: response.data.ponds, _metadata: response.data._metadata };
     }
     case 'createPond': {
@@ -3098,7 +3193,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== TIMEFRAMES ====================
     case 'listTimeframes': {
-      const response = await fubApi.get('/timeframes');
+      const response = await fubApi.get('/timeframes', { params: { limit: 100, ...args } });
       return { timeframes: response.data.timeframes, _metadata: response.data._metadata };
     }
 
@@ -3152,7 +3247,7 @@ export async function handleToolCall(name, rawArgs) {
       return { success: true, message: `Inbox app ${id} deactivated` };
     }
     case 'listInboxAppInstallations': {
-      const response = await fubApi.get('/inboxApps');
+      const response = await fubApi.get('/inboxApps', { params: { limit: 100, ...args } });
       return response.data;
     }
 
