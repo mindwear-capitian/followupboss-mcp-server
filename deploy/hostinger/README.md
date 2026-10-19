@@ -29,7 +29,7 @@ Make up a password of **12 or more characters**. Write it in your notes. You typ
 ## Step 3: Buy the server
 
 1. Click the **Deploy on Hostinger** button at the top of this page.
-2. Under **KVM 1**, click **Choose plan**. KVM 1 is the smallest plan and is more than enough.
+2. Scroll down to the plan cards. On the first card, **KVM 1**, click **Choose plan**. KVM 1 is the smallest plan and is more than enough. (You do not need the purple "Most popular" plan.)
 3. In the cart:
    - **Period:** any length you want.
    - **Daily auto-backup:** not needed.
@@ -41,7 +41,7 @@ Make up a password of **12 or more characters**. Write it in your notes. You typ
 After checkout, Hostinger sets up the server and opens **Docker Manager** with this project.
 
 1. If Hostinger asks for an **Application name**, type `fub-mcp`.
-2. Find the box named **Environment**. (It is below the long code box. Scroll down.)
+2. Find the box named **Environment**. It is below the long code box, so scroll down. If you do not see it, click the **.yaml editor** tab first.
 3. Type these 2 lines in the Environment box. Use your own key and password, with no spaces:
 
    ```
@@ -60,12 +60,12 @@ At the top of the Docker Manager page, look for a name like `srv123456.hstgr.clo
 
 ## Step 6: Connect Claude
 
-1. Go to [claude.ai](https://claude.ai) and open **Settings**.
+1. Go to [claude.ai](https://claude.ai). Click your name at the bottom left, then click **Settings**.
 2. Under **Customize**, click **Connectors**.
 3. Click **+ Add**, then **Add custom connector**.
 4. **Name:** `Follow Up Boss`
 5. **MCP server URL:** `https://` + your server address + `/mcp`. Example: `https://srv123456.hstgr.cloud/mcp`
-6. Click **Continue**.
+6. Click **Continue**, then finish the next screen.
 7. A page named **Follow Up Boss MCP** opens. Type your password from step 2 and click **Authorize**.
 
 The first connection can take up to 30 seconds while your server gets its free HTTPS certificate.
