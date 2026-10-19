@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased (v2.0.0)
 
+### Added
+
+- **One-click install on Hostinger.** A Deploy on Hostinger button sets up
+  your own server with HTTPS (Caddy) and connects to Claude on the web,
+  desktop or phone. See `deploy/hostinger/`.
+- **Docker image** at `ghcr.io/mindwear-capitian/followupboss-mcp-server`,
+  built on each release tag.
+- **Wrong-password lockout.** Five wrong passwords from one address lock it
+  out for 15 minutes (`MCP_AUTH_MAX_FAILS`, `MCP_AUTH_LOCK_MINUTES`), with a
+  server-wide cap of 50 (`MCP_AUTH_GLOBAL_MAX_FAILS`).
+- **`MCP_REQUIRE_AUTH=true`** refuses to start without a password of 12 or
+  more characters. The Docker image sets it.
+- **`MCP_TRUST_PROXY`** for installs behind a reverse proxy.
+
 ### Fixed
 
 - **11 list tools returned only the first 10 rows.** `listStages`,

@@ -4,6 +4,14 @@
 
 **Built by [Ed Neuhaus](https://neuhausre.com) — broker / owner at [Neuhaus Realty Group](https://neuhausre.com) in Austin, Texas.** Licensed real estate broker since 2009, 19+ years in the business. I built this because I wanted to talk to my own FUB account in plain English. It's free for self-host use under the [Elastic License 2.0](LICENSE).
 
+### One-click install on Hostinger
+
+No terminal needed. Get your own server and connect it to Claude on the web, desktop or phone. Pick the **KVM 1** plan.
+
+[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostinger.com/docker-hosting?compose_url=https%3A%2F%2Fraw.githubusercontent.com%2Fmindwear-capitian%2Ffollowupboss-mcp-server%2Fmain%2Fdeploy%2Fhostinger%2Fdocker-compose.yml&REFERRALCODE=LKDTGEDSNSTG)
+
+Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
+
 ### Other things I'm working on
 
 - **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile, more on how this one's built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)

@@ -3476,6 +3476,20 @@ export async function startHttp(opts = {}) {
   const LEGACY_MODE = process.env.MCP_LEGACY === 'reject' ? 'reject' : 'stateless';
   const ACCESS_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   const AUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  const MIN_PASSWORD_LENGTH = 12;
+
+  // Internet-facing installs (the Docker image sets MCP_REQUIRE_AUTH=true)
+  // must never start open or behind a guessable password.
+  if (process.env.MCP_REQUIRE_AUTH === 'true') {
+    if (AUTH_DISABLED) {
+      console.error('ERROR: MCP_REQUIRE_AUTH=true but MCP_AUTH_PASSWORD is not set. Refusing to start.');
+      process.exit(1);
+    }
+    if (AUTH_PASSWORD && AUTH_PASSWORD.length < MIN_PASSWORD_LENGTH) {
+      console.error(`ERROR: MCP_AUTH_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters. Refusing to start.`);
+      process.exit(1);
+    }
+  }
 
   if (AUTH_DISABLED) {
     console.error('WARNING: HTTP transport running without auth. Anyone who knows the URL can call the MCP.');
@@ -3486,6 +3500,9 @@ export async function startHttp(opts = {}) {
   }
 
   const app = express();
+  // Behind a reverse proxy (Caddy in deploy/hostinger), req.ip is the proxy
+  // unless Express trusts the forwarded client address. Set to the hop count.
+  if (process.env.MCP_TRUST_PROXY) app.set('trust proxy', parseInt(process.env.MCP_TRUST_PROXY, 10) || 1);
   app.use(express.json({ limit: '4mb' }));
   app.use(express.urlencoded({ extended: false }));
 
@@ -3551,6 +3568,27 @@ export async function startHttp(opts = {}) {
     if (ab.length !== bb.length) return false;
     return timingSafeEqual(ab, bb);
   }
+
+  // Wrong-password lockout for POST /oauth/authorize. Per client IP, plus a
+  // looser server-wide cap so a flood from many IPs still stalls. In memory:
+  // a restart clears it, which is fine for a lockout this short.
+  const AUTH_MAX_FAILS = parseInt(process.env.MCP_AUTH_MAX_FAILS || '5', 10);
+  const AUTH_GLOBAL_MAX_FAILS = parseInt(process.env.MCP_AUTH_GLOBAL_MAX_FAILS || '50', 10);
+  const AUTH_LOCK_MS = parseInt(process.env.MCP_AUTH_LOCK_MINUTES || '15', 10) * 60 * 1000;
+  const authFails = new Map(); // ip (or '*' for all) -> timestamps of recent wrong passwords
+  const recentAuthFails = (key) => {
+    const cutoff = Date.now() - AUTH_LOCK_MS;
+    const list = (authFails.get(key) || []).filter(t => t > cutoff);
+    if (list.length) authFails.set(key, list); else authFails.delete(key);
+    return list;
+  };
+  const authLocked = (ip) =>
+    recentAuthFails(ip).length >= AUTH_MAX_FAILS || recentAuthFails('*').length >= AUTH_GLOBAL_MAX_FAILS;
+  const recordAuthFail = (ip) => {
+    const now = Date.now();
+    for (const key of [ip, '*']) authFails.set(key, [...recentAuthFails(key), now]);
+  };
+  setInterval(() => { for (const k of [...authFails.keys()]) recentAuthFails(k); }, 60 * 1000).unref();
 
   // Health endpoint (no auth)
   app.get('/health', (_req, res) => {
@@ -3668,7 +3706,14 @@ export async function startHttp(opts = {}) {
     if (!client) return res.status(400).send('Invalid client_id');
     if (!client.redirect_uris.includes(redirect_uri)) return res.status(400).send('redirect_uri not registered');
 
+    if (authLocked(req.ip)) {
+      const minutes = Math.ceil(AUTH_LOCK_MS / 60000);
+      res.set('Retry-After', String(minutes * 60));
+      return res.status(429).send(`Too many wrong passwords. Try again in ${minutes} minutes.`);
+    }
+
     if (!password || !constantTimeEq(password, AUTH_PASSWORD)) {
+      recordAuthFail(req.ip);
       const q = new URLSearchParams({
         client_id, redirect_uri, state: state || '', code_challenge,
         code_challenge_method: 'S256', response_type: 'code',
