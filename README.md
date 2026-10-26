@@ -32,11 +32,15 @@ Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
 >
 > Several FUB API endpoints are marked **"Restricted - Registered Systems Only"** and require `X-System` + `X-System-Key` headers (this MCP exposes them as `FUB_SYSTEM` + `FUB_SYSTEM_KEY` env vars). These endpoints include: **webhooks, inbox apps, automations (2.0), text-message logging, person/deal attachments.**
 >
-> **These credentials are issued by FUB to approved third-party integration partners — not to end users of FUB.** Setting these env vars is meant for developers who have registered a real third-party app with FUB and received their own dedicated `X-System` name and key.
+> **You get these credentials by registering your own system with FUB.** Registration is self-serve at https://apps.followupboss.com/system-registration: you choose the system name, and FUB issues a 32-character key. The name and key are yours alone. FUB's API terms require you to keep the key confidential and not share it.
+>
+> **How FUB uses the name:**
+> - On restricted endpoints, FUB checks the name you registered. A name that does not match your key is refused (403), and webhooks are listed and created under the registered name.
+> - On all other endpoints, the name is a label. FUB shows it on the notes and records the MCP creates, so set `FUB_SYSTEM` to a name you will recognize in your timeline.
 >
 > **DO NOT:**
 > - Reuse `X-System` credentials from another app or integration you've found online.
-> - Make up a system name and hope FUB accepts it.
+> - Use a name you did not register to reach restricted endpoints.
 > - Borrow a partner's credentials.
 >
 > **Doing any of the above to access restricted endpoints may violate Follow Up Boss's Terms of Service and could get your FUB account suspended or banned, with no notice.** FUB's rate-limit + identification policy is documented at https://docs.followupboss.com/reference#identification.
