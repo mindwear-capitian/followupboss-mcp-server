@@ -2608,6 +2608,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'updatePersonAttachment': {
+      requireSystemCreds('updatePersonAttachment');
       const { id, ...body } = args;
       const response = await fubApi.put(`/personAttachments/${id}`, body);
       return response.data;
@@ -3134,11 +3135,13 @@ export async function handleToolCall(name, rawArgs) {
       return { groups: response.data.groups, _metadata: response.data._metadata };
     }
     case 'listRoundRobinGroups': {
-      const response = await fubApi.get('/groups/roundRobin');
+      const response = await fubApi.get('/groups/roundRobin', { params: args });
       return { groups: response.data.groups, _metadata: response.data._metadata };
     }
     case 'createGroup': {
-      const response = await fubApi.post('/groups', args);
+      const { userIds, ...rest } = args;
+      const body = rest.users === undefined && userIds !== undefined ? { ...rest, users: userIds } : rest;
+      const response = await fubApi.post('/groups', body);
       return response.data;
     }
     case 'getGroup': {
@@ -3146,7 +3149,8 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'updateGroup': {
-      const { id, ...body } = args;
+      const { id, userIds, ...rest } = args;
+      const body = rest.users === undefined && userIds !== undefined ? { ...rest, users: userIds } : rest;
       const response = await fubApi.put(`/groups/${id}`, body);
       return response.data;
     }
@@ -3218,37 +3222,40 @@ export async function handleToolCall(name, rawArgs) {
     // Old "/inboxApps/addMessage" style was wrong (no such collection); FUB uses
     // /inboxApps/messages, /inboxApps/notes, /inboxApps/conversations/:id, etc.
     case 'inboxAppAddMessage': {
-      const response = await fubApi.post('/inboxApps/messages', args);
+      const { inboxAppId, ...body } = args;
+      const response = await fubApi.post(`/inboxApps/${inboxAppId}/message`, body);
       return response.data;
     }
     case 'inboxAppUpdateMessage': {
-      const { messageId, id, ...body } = args;
-      const mid = messageId || id;
-      const response = await fubApi.put(`/inboxApps/messages/${mid}`, body);
+      const { inboxAppId, messageId, ...body } = args;
+      if (body.id === undefined && messageId !== undefined) body.id = messageId;
+      const response = await fubApi.put(`/inboxApps/${inboxAppId}/message`, body);
       return response.data;
     }
     case 'inboxAppAddNote': {
-      const response = await fubApi.post('/inboxApps/notes', args);
+      const { inboxAppId, ...body } = args;
+      const response = await fubApi.post(`/inboxApps/${inboxAppId}/note`, body);
       return response.data;
     }
     case 'inboxAppUpdateConversation': {
-      const { conversationId, id, ...body } = args;
-      const cid = conversationId || id;
-      const response = await fubApi.put(`/inboxApps/conversations/${cid}`, body);
+      const { inboxAppId, extConversationId, ...body } = args;
+      const response = await fubApi.put(`/inboxApps/${inboxAppId}/conversations/${encodeURIComponent(extConversationId)}`, body);
       return response.data;
     }
     case 'inboxAppGetParticipants': {
-      const response = await fubApi.get('/inboxApps/participants', { params: args });
+      const { inboxAppId, extConversationId } = args;
+      const response = await fubApi.get(`/inboxApps/${inboxAppId}/conversations/${encodeURIComponent(extConversationId)}/participants`);
       return response.data;
     }
     case 'inboxAppCreateParticipant': {
-      const response = await fubApi.post('/inboxApps/participants', args);
+      const { inboxAppId, extConversationId, ...body } = args;
+      const response = await fubApi.post(`/inboxApps/${inboxAppId}/conversations/${encodeURIComponent(extConversationId)}/participants`, body);
       return response.data;
     }
     case 'inboxAppDeleteParticipant': {
-      const { id, participantId } = args;
-      const pid = id || participantId;
-      await fubApi.delete(`/inboxApps/participants/${pid}`);
+      const { inboxAppId, extConversationId, participantId, id } = args;
+      const pid = participantId || id;
+      await fubApi.delete(`/inboxApps/${inboxAppId}/conversations/${encodeURIComponent(extConversationId)}/participants/${pid}`);
       return { success: true, message: `Participant ${pid} removed` };
     }
     case 'inboxAppInstall': {
@@ -3263,7 +3270,8 @@ export async function handleToolCall(name, rawArgs) {
       return { success: true, message: `Inbox app ${id} deactivated` };
     }
     case 'listInboxAppInstallations': {
-      const response = await fubApi.get('/inboxApps', { params: { limit: 100, ...args } });
+      const { publishedInboxAppId, ...params } = args;
+      const response = await fubApi.get(`/inboxApps/installedApps/${publishedInboxAppId}`, { params });
       return response.data;
     }
 
@@ -3273,13 +3281,14 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'createReaction': {
-      const { refType, refId, ...body } = args;
+      const { refType, refId, emoji, ...body } = args;
+      if (body.body === undefined && emoji !== undefined) body.body = emoji;
       const response = await fubApi.post(`/reactions/${refType}/${refId}`, body);
       return response.data;
     }
     case 'deleteReaction': {
-      const { refType, refId } = args;
-      await fubApi.delete(`/reactions/${refType}/${refId}`);
+      const { refType, refId, emoji } = args;
+      await fubApi.delete(`/reactions/${refType}/${refId}`, emoji ? { params: { emoji } } : undefined);
       return { success: true, message: 'Reaction deleted' };
     }
 
