@@ -2560,7 +2560,7 @@ export async function handleToolCall(name, rawArgs) {
 
     // ==================== PEOPLE ====================
     case 'listPeople': {
-      const response = await fubApi.get('/people', { params: args });
+      const response = await fubApi.get('/people', { params: { sort: '-created', ...args } });
       return { people: response.data.people, _metadata: response.data._metadata };
     }
     case 'createPerson': {
@@ -3384,6 +3384,9 @@ export async function handleToolCall(name, rawArgs) {
 
 // Single source of truth for "is this a destructive delete tool?" — used both to
 // filter the advertised tool surface and to enforce Safe Mode at dispatch time.
+// Server instructions: sent once at connect. Tells the AI the one-call answer to common questions.
+export const DEFAULT_INSTRUCTIONS = `__INSTRUCTIONS__`;
+
 export function isDeleteTool(name) {
   const n = String(name).toLowerCase();
   return n.startsWith('delete')
@@ -3391,9 +3394,64 @@ export function isDeleteTool(name) {
     || name === 'inboxAppDeactivate';
 }
 
-export const activeTools = FUB_SAFE_MODE
-  ? TOOL_DEFINITIONS.filter(t => !isDeleteTool(t.name))
-  : TOOL_DEFINITIONS;
+// ---------------------------------------------------------------------------
+// Tool groups (FUB_TOOL_GROUPS), annotations, always-load hints.
+// FUB_TOOL_GROUPS: comma list of core,setup,marketing,integrations,delete or "all" (default).
+// The tool list is a server setting: the same for every caller of this server.
+// ---------------------------------------------------------------------------
+const CORE_TOOLS = new Set([
+  'listPeople', 'getPerson', 'createPerson', 'updatePerson', 'getPersonByEmail',
+  'listNotes', 'createNote', 'listTasks', 'createTask', 'updateTask',
+  'listAppointments', 'createAppointment', 'updateAppointment',
+  'listCalls', 'listTextMessages', 'listDeals', 'getDeal', 'createDeal', 'updateDeal',
+  'listSmartLists', 'listStages', 'removeTagFromPerson', 'help'
+]);
+const MARKETING_PREFIX = /^(list|get|create|update|delete|merge)?(Template|TextMessageTemplate|EmCampaign|EmEvent|ActionPlan|Automation)/;
+const INTEGRATION_PREFIX = /^(list|get|create|update|delete)?(Webhook|Event|PersonAttachment|DealAttachment|Reaction|ThreadedReplies|InboxApp)|^inboxApp/;
+
+export function toolGroup(name) {
+  if (isDeleteTool(name)) return 'delete';
+  if (CORE_TOOLS.has(name)) return 'core';
+  if (MARKETING_PREFIX.test(name) || /^(add|update)PersonToActionPlan|^addPersonToAutomation|ActionPlan|Automation/.test(name)) return 'marketing';
+  if (INTEGRATION_PREFIX.test(name) || /Webhook|Reaction|ThreadedRepl|Attachment|^inboxApp|^listInboxApp|^(create|list|get)Event/.test(name)) return 'integrations';
+  return 'setup';
+}
+
+const FUB_TOOL_GROUPS = (() => {
+  const raw = (process.env.FUB_TOOL_GROUPS || 'all').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+  return raw.includes('all') ? null : new Set(raw);
+})();
+
+// MCP tool annotations. Claude uses them for permissions (read-only tools can run
+// without approval; destructive tools always ask). ChatGPT requires them.
+export function toolAnnotations(name) {
+  const n = String(name);
+  const readOnly = /^(list|get|search|check|help|about|merge)/.test(n);
+  const del = isDeleteTool(n) || n === 'removeTagFromPerson';
+  const send = /^send/.test(n);
+  return {
+    readOnlyHint: readOnly,
+    destructiveHint: !readOnly && (del || /^(update|bulkUpdate)/.test(n)),
+    idempotentHint: readOnly || del || /^update/.test(n),
+    openWorldHint: send
+  };
+}
+
+// Tools Claude Code loads up front instead of behind tool search.
+const ALWAYS_LOAD = new Set((process.env.FUB_ALWAYS_LOAD ||
+  'listPeople,getPerson,getPersonByEmail,listTasks,createTask,createNote,listAppointments')
+  .split(',').map(x => x.trim()).filter(Boolean));
+
+export function decorateTool(t) {
+  const out = { ...t, annotations: { ...toolAnnotations(t.name), ...(t.annotations || {}) } };
+  if (ALWAYS_LOAD.has(t.name)) out._meta = { ...(t._meta || {}), 'anthropic/alwaysLoad': true };
+  return out;
+}
+
+export const activeTools = TOOL_DEFINITIONS
+  .filter(t => !(FUB_SAFE_MODE && isDeleteTool(t.name)))
+  .filter(t => !FUB_TOOL_GROUPS || FUB_TOOL_GROUPS.has(toolGroup(t.name)))
+  .map(decorateTool);
 
 /**
  * Create an MCP Server with the FUB tool surface.
@@ -3408,7 +3466,7 @@ export const activeTools = FUB_SAFE_MODE
  *   server handshake. Useful for extensions that want to identify themselves.
  */
 export function createServer(opts = {}) {
-  const { extraTools = [], extraHandler = null, serverInfo = {} } = opts;
+  const { extraTools = [], extraHandler = null, serverInfo = {}, instructions = '' } = opts;
 
   const server = new Server(
     {
@@ -3418,6 +3476,7 @@ export function createServer(opts = {}) {
     },
     {
       capabilities: { tools: {} },
+      instructions: [DEFAULT_INSTRUCTIONS, instructions].filter(Boolean).join('\n\n'),
       // 2026-07-28 cache hints for list results. The tool list only changes on a redeploy.
       cacheHints: {
         'tools/list': { ttlMs: 5 * 60 * 1000, cacheScope: 'public' },
@@ -3428,7 +3487,7 @@ export function createServer(opts = {}) {
 
   // Active built-in tools (filtered for SAFE MODE) + any caller-supplied extras.
   // Extras are NOT auto-filtered by SAFE MODE -- caller decides per-tool.
-  const extendedTools = [...activeTools, ...extraTools];
+  const extendedTools = [...activeTools, ...extraTools.map(decorateTool)];
   const extraToolNames = new Set(extraTools.map(t => t.name));
 
   server.setRequestHandler('tools/list', async () => ({
