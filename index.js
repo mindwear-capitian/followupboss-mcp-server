@@ -313,41 +313,387 @@ export const TOOL_DEFINITIONS = [
 // ==================== EVENTS ====================
 {
   "name": "listEvents",
-  "description": "List events from FUB. Filter by personId, type, property address, etc.",
+  "description": "List events, newest first by FUB default. Filter by person, event type, or property.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "personId": { "type": "number", "description": "Filter by person ID" },
-      "type": { "type": "string", "description": "Filter by event type" },
-      "hasProperty": { "type": "boolean", "description": "Filter events that have property data" },
-      "propertyAddress": { "type": "string", "description": "Filter by property address" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Only events for this person."
+      },
+      "type": {
+        "type": "string",
+        "description": "Comma-separated types, e.g. 'Registration,Property Inquiry'. Full list = createEvent type enum."
+      },
+      "hasProperty": {
+        "type": "boolean",
+        "description": "true = only events with an associated property."
+      },
+      "propertyAddress": {
+        "type": "string",
+        "description": "Partial-match search of property addresses."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createEvent",
-  "description": "Create a new event in FUB (lead event, property inquiry, etc)",
+  "description": "Create an event (lead registration, inquiry, page view). Dedupes the person by phone/email and creates them if new. Events older than 1 day count as historical and fire no workflows. 'Inquiry' becomes Property Inquiry if property is set, else General Inquiry.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "source": { "type": "string", "description": "Source of the event (e.g. website name)" },
-      "system": { "type": "string", "description": "System identifier" },
-      "type": { "type": "string", "description": "Event type (e.g. Registration, Property Inquiry, General Inquiry)" },
-      "message": { "type": "string", "description": "Event message" },
-      "description": { "type": "string", "description": "Event description" },
-      "occurredAt": { "type": "string", "description": "ISO 8601 timestamp when event occurred" },
-      "person": { "type": "object", "description": "Person data: {id, firstName, lastName, stage, source, sourceUrl, contacted, price, assignedTo, assignedUserId, assignedLenderId, assignedLenderName, emails:[], phones:[], addresses:[], tags:[], custom*}" },
-      "property": { "type": "object", "description": "Property data: {street, city, state, code, mlsNumber, price, forRent, url, type, bedrooms, bathrooms, area, lot}" },
-      "propertySearch": { "type": "object", "description": "Property search criteria: {type, neighborhood, city, state, code, minPrice, maxPrice, minBedrooms, maxBedrooms, minBathrooms, maxBathrooms}" },
-      "campaign": { "type": "object", "description": "Campaign tracking: {source, medium, term, content, campaign}" },
-      "pageTitle": { "type": "string", "description": "Title of the page where event occurred" },
-      "pageUrl": { "type": "string", "description": "URL of the page where event occurred" },
-      "pageReferrer": { "type": "string", "description": "Referrer URL" },
-      "pageDuration": { "type": "number", "description": "Time spent on page in seconds" }
+      "source": {
+        "type": "string",
+        "description": "Lead source name."
+      },
+      "system": {
+        "type": "string",
+        "description": "Name of the system providing the lead."
+      },
+      "type": {
+        "type": "string",
+        "description": "Event type.",
+        "enum": [
+          "Registration",
+          "Inquiry",
+          "Seller Inquiry",
+          "Property Inquiry",
+          "General Inquiry",
+          "Viewed Property",
+          "Saved Property",
+          "Visited Website",
+          "Incoming Call",
+          "Unsubscribed",
+          "Property Search",
+          "Saved Property Search",
+          "Visited Open House",
+          "Viewed Page"
+        ]
+      },
+      "message": {
+        "type": "string",
+        "description": "Message from the lead about the inquiry."
+      },
+      "description": {
+        "type": "string",
+        "description": "Additional info about the inquiry."
+      },
+      "occurredAt": {
+        "type": "string",
+        "description": "When it occurred (ISO 8601). Docs type it as date."
+      },
+      "person": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Existing person ID; 404 if not found."
+          },
+          "firstName": {
+            "type": "string",
+            "description": "First name"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name"
+          },
+          "stage": {
+            "type": "string",
+            "description": "Stage name, e.g. Lead"
+          },
+          "source": {
+            "type": "string",
+            "description": "Lead source"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "description": "Link to record at lead provider"
+          },
+          "contacted": {
+            "type": "boolean",
+            "description": "Default false"
+          },
+          "price": {
+            "type": "integer",
+            "description": "Estimated price"
+          },
+          "assignedTo": {
+            "type": "string",
+            "description": "Agent full name"
+          },
+          "assignedUserId": {
+            "type": "integer",
+            "description": "Agent user ID"
+          },
+          "assignedLenderName": {
+            "type": "string",
+            "description": "Lender full name"
+          },
+          "assignedLenderId": {
+            "type": "integer",
+            "description": "Lender user ID"
+          },
+          "emails": {
+            "type": "array",
+            "description": "Emails. First entry becomes primary. Each needs value.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Email address"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "e.g. work, home"
+                },
+                "isPrimary": {
+                  "type": "boolean",
+                  "description": "Not needed; first entry is primary"
+                }
+              },
+              "required": [
+                "value"
+              ]
+            }
+          },
+          "phones": {
+            "type": "array",
+            "description": "Phones. First entry becomes primary. Each needs value.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Phone number, e.g. 888-555-1234"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "e.g. mobile, home, fax"
+                },
+                "isPrimary": {
+                  "type": "boolean",
+                  "description": "Not needed; first entry is primary"
+                }
+              },
+              "required": [
+                "value"
+              ]
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "description": "Contact addresses (not property addresses).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "home (default), work, mailing, investment"
+                },
+                "street": {
+                  "type": "string",
+                  "description": "Street"
+                },
+                "city": {
+                  "type": "string",
+                  "description": "City"
+                },
+                "state": {
+                  "type": "string",
+                  "description": "2-letter state code"
+                },
+                "code": {
+                  "type": "string",
+                  "description": "ZIP code as string"
+                },
+                "country": {
+                  "type": "string",
+                  "description": "Country name"
+                }
+              },
+              "required": []
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags to apply"
+          }
+        },
+        "required": [],
+        "additionalProperties": true
+      },
+      "property": {
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string",
+            "description": "Street"
+          },
+          "city": {
+            "type": "string",
+            "description": "City"
+          },
+          "state": {
+            "type": "string",
+            "description": "State code"
+          },
+          "code": {
+            "type": "string",
+            "description": "ZIP"
+          },
+          "mlsNumber": {
+            "type": "string",
+            "description": "MLS number"
+          },
+          "price": {
+            "type": "integer",
+            "description": "Asking price"
+          },
+          "forRent": {
+            "type": "boolean",
+            "description": "true if for rent"
+          },
+          "url": {
+            "type": "string",
+            "description": "Listing URL"
+          },
+          "type": {
+            "type": "string",
+            "description": "Freeform type, e.g. Bungalow"
+          },
+          "bedrooms": {
+            "type": "string",
+            "description": "Bedrooms"
+          },
+          "bathrooms": {
+            "type": "string",
+            "description": "Bathrooms"
+          },
+          "area": {
+            "type": "string",
+            "description": "Square feet"
+          },
+          "lot": {
+            "type": "string",
+            "description": "Acres"
+          }
+        },
+        "required": []
+      },
+      "propertySearch": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "e.g. Residential, Lot"
+          },
+          "neighborhood": {
+            "type": "string",
+            "description": "Neighborhood"
+          },
+          "city": {
+            "type": "string",
+            "description": "City"
+          },
+          "state": {
+            "type": "string",
+            "description": "State"
+          },
+          "code": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ZIP codes"
+          },
+          "minPrice": {
+            "type": "integer",
+            "description": "Min price"
+          },
+          "maxPrice": {
+            "type": "integer",
+            "description": "Max price"
+          },
+          "minBedrooms": {
+            "type": "integer",
+            "description": "Min beds"
+          },
+          "maxBedrooms": {
+            "type": "integer",
+            "description": "Max beds"
+          },
+          "minBathrooms": {
+            "type": "number",
+            "description": "Min baths"
+          },
+          "maxBathrooms": {
+            "type": "number",
+            "description": "Max baths"
+          }
+        },
+        "required": []
+      },
+      "campaign": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Campaign source, e.g. Google"
+          },
+          "medium": {
+            "type": "string",
+            "description": "e.g. organic"
+          },
+          "term": {
+            "type": "string",
+            "description": "Search terms"
+          },
+          "content": {
+            "type": "string",
+            "description": "Content"
+          },
+          "campaign": {
+            "type": "string",
+            "description": "Campaign name"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "pageTitle": {
+        "type": "string",
+        "description": "Page title (Viewed Page)."
+      },
+      "pageUrl": {
+        "type": "string",
+        "description": "Page URL (Viewed Page)."
+      },
+      "pageReferrer": {
+        "type": "string",
+        "description": "Referrer URL; also set pageUrl."
+      },
+      "pageDuration": {
+        "type": "integer",
+        "description": "Seconds on page."
+      }
     },
     "required": []
   }
@@ -367,121 +713,493 @@ export const TOOL_DEFINITIONS = [
 // ==================== PEOPLE ====================
 {
   "name": "listPeople",
-  "description": "List/search people in FUB. Supports filtering by name, email, phone, tags, stage, source, assignedTo, price range, smart list, and more. For tag filtering use the tags parameter (comma-separated, OR logic). For email lookup use the email parameter.",
+  "description": "List/search people, newest created first by default. Custom-field filters: pass any custom* key (e.g. customClosingDate); dates: ',2026-01-01' = on or before, '2026-01-01' = on or after, 'a,b' = inclusive. Filter by name, email, phone, stage name, tags (ANY), owner, price, smart list.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "string", "description": "Comma-separated person IDs" },
-      "sort": { "type": "string", "description": "Field to sort by (default created). Prefix with - for newest/highest first, e.g. -lastActivity. Valid: id, created, updated, name, firstName, lastName, price, stage, lastActivity, lastCommunication, lastReceivedEmail, lastSentEmail, lastEmail, emailsReceived, emailsSent, lastIncomingCall, lastOutgoingCall, lastCall, firstCall, callsIncoming, callsOutgoing, callsDuration, lastReceivedText, lastSentText, lastText, lastLeadActivity, lastEmEventActivity, lastIdxVisit, textsReceived, textsSent, propertiesViewed, propertiesSaved, pagesViewed, nextTask, or a custom field (e.g. customClosePrice). FUB silently ignores an unknown name and uses the default order." },
-      "limit": { "type": "number", "description": "Max results per call (default 10, max 100)" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return" },
-      "lastActivityAfter": { "type": "string", "description": "ISO date - only people with activity after this date" },
-      "lastActivityBefore": { "type": "string", "description": "ISO date - only people with activity before this date" },
-      "name": { "type": "string", "description": "Search by name" },
-      "firstName": { "type": "string", "description": "Filter by first name" },
-      "lastName": { "type": "string", "description": "Filter by last name" },
-      "email": { "type": "string", "description": "Filter by email" },
-      "phone": { "type": "string", "description": "Filter by phone" },
-      "stage": { "type": "string", "description": "Stage NAME, not ID (e.g. \"Lead\" or \"Trash\"). Call listStages for this account's stage names." },
-      "source": { "type": "string", "description": "Lead source text, exactly as it appears in the person's source field" },
-      "assignedTo": { "type": "string", "description": "Filter by assigned agent name" },
-      "assignedUserId": { "type": "number", "description": "Filter by assigned user ID" },
-      "assignedPondId": { "type": "number", "description": "Filter by assigned pond ID" },
-      "assignedLenderName": { "type": "string", "description": "Filter by lender name" },
-      "assignedLenderId": { "type": "number", "description": "Filter by lender ID" },
-      "contacted": { "type": "boolean", "description": "Filter by contacted status" },
-      "priceAbove": { "type": "number", "description": "Minimum price filter" },
-      "priceBelow": { "type": "number", "description": "Maximum price filter" },
-      "smartListId": { "type": "number", "description": "Filter by smart list ID" },
-      "includeTrash": { "type": "boolean", "description": "Include trashed people" },
-      "includeUnclaimed": { "type": "boolean", "description": "Include unclaimed people" },
-      "tags": { "type": "string", "description": "Comma-separated tags to filter by" }
+      "id": {
+        "type": "string",
+        "description": "Comma-separated person IDs."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Default -created (newest first). '-' = descending. e.g. id, updated, name, price, stage, lastActivity, nextTask, customX."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated fields; allFields = everything, allCustom = all custom fields. id always included."
+      },
+      "lastActivityAfter": {
+        "type": "string",
+        "description": "Last activity after this time, e.g. 2016-11-23 01:02:03."
+      },
+      "lastActivityBefore": {
+        "type": "string",
+        "description": "Last activity before this time, e.g. 2016-11-23 01:02:03."
+      },
+      "name": {
+        "type": "string",
+        "description": "Partial name match."
+      },
+      "firstName": {
+        "type": "string",
+        "description": "Partial first-name match."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Partial last-name match."
+      },
+      "email": {
+        "type": "string",
+        "description": "Email address."
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone number."
+      },
+      "stage": {
+        "type": "string",
+        "description": "Stage NAME, not ID (e.g. Lead, Trash). Use listStages."
+      },
+      "source": {
+        "type": "string",
+        "description": "Lead source text."
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Assigned user's name."
+      },
+      "assignedUserId": {
+        "type": "integer",
+        "description": "Assigned user ID."
+      },
+      "assignedPondId": {
+        "type": "integer",
+        "description": "Assigned pond ID."
+      },
+      "assignedLenderName": {
+        "type": "string",
+        "description": "Assigned lender name."
+      },
+      "assignedLenderId": {
+        "type": "integer",
+        "description": "Assigned lender user ID."
+      },
+      "contacted": {
+        "type": "boolean",
+        "description": "Filter by contacted."
+      },
+      "priceAbove": {
+        "type": "integer",
+        "description": "Price above this."
+      },
+      "priceBelow": {
+        "type": "integer",
+        "description": "Price below this."
+      },
+      "smartListId": {
+        "type": "integer",
+        "description": "People in this smart list."
+      },
+      "includeTrash": {
+        "type": "boolean",
+        "description": "Include Trash stage. Default false."
+      },
+      "includeUnclaimed": {
+        "type": "boolean",
+        "description": "Include unclaimed leads offered to current user. Default false."
+      },
+      "tags": {
+        "type": "string",
+        "description": "Comma-separated tags; matches people with ANY."
+      }
     },
-    "required": []
+    "required": [],
+    "additionalProperties": true
   }
 },
 {
   "name": "createPerson",
-  "description": "Create a new person/contact in FUB. Custom fields are supported: include them as additional top-level keys prefixed with 'custom' (e.g. customClosingDate) — run listCustomFields to see this account's field names.",
+  "description": "Create a person. Custom fields: add top-level keys prefixed 'custom' (e.g. customClosingDate; see listCustomFields). Set deduplicate=true to avoid duplicates. source and sourceUrl can only be set here, not on update.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "deduplicate": { "type": "boolean", "description": "Check for duplicates before creating (query param)" },
-      "createdAt": { "type": "string", "description": "ISO timestamp for creation date" },
-      "firstName": { "type": "string", "description": "First name" },
-      "lastName": { "type": "string", "description": "Last name" },
-      "stage": { "type": "string", "description": "Pipeline stage" },
-      "source": { "type": "string", "description": "Lead source" },
-      "sourceUrl": { "type": "string", "description": "Source URL" },
-      "contacted": { "type": "boolean", "description": "Whether person has been contacted" },
-      "price": { "type": "number", "description": "Price point" },
-      "assignedTo": { "type": "string", "description": "Assigned agent name" },
-      "assignedUserId": { "type": "number", "description": "Assigned user ID" },
-      "assignedPondId": { "type": "number", "description": "Assigned pond ID" },
-      "assignedLenderName": { "type": "string", "description": "Assigned lender name" },
-      "assignedLenderId": { "type": "number", "description": "Assigned lender ID" },
-      "emails": { "type": "array", "description": "Email addresses: [{value, type}]", "items": { "type": "object" } },
-      "phones": { "type": "array", "description": "Phone numbers: [{value, type}]", "items": { "type": "object" } },
-      "addresses": { "type": "array", "description": "Addresses: [{street, city, state, code, type}]", "items": { "type": "object" } },
-      "tags": { "type": "array", "description": "Tags to apply", "items": { "type": "string" } },
-      "background": { "type": "string", "description": "Background info" },
-      "collaborators": { "type": "array", "description": "Collaborator user IDs", "items": { "type": "number" } },
-      "timeframeId": { "type": "number", "description": "Timeframe ID" }
+      "firstName": {
+        "type": "string",
+        "description": "First name."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name."
+      },
+      "stage": {
+        "type": "string",
+        "description": "Stage name. Default Lead on create."
+      },
+      "contacted": {
+        "type": "boolean",
+        "description": "true also pauses action plans."
+      },
+      "price": {
+        "type": "integer",
+        "description": "Price point."
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Assigned agent full name."
+      },
+      "assignedUserId": {
+        "type": "integer",
+        "description": "Assigned user ID."
+      },
+      "assignedPondId": {
+        "type": "integer",
+        "description": "Assigned pond ID."
+      },
+      "assignedLenderName": {
+        "type": "string",
+        "description": "Lender full name."
+      },
+      "assignedLenderId": {
+        "type": "integer",
+        "description": "Lender user ID."
+      },
+      "emails": {
+        "type": "array",
+        "description": "Emails. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. work, home"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "phones": {
+        "type": "array",
+        "description": "Phones. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Phone number, e.g. 888-555-1234"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. mobile, home, fax"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "addresses": {
+        "type": "array",
+        "description": "Contact addresses (not property addresses).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "home (default), work, mailing, investment"
+            },
+            "street": {
+              "type": "string",
+              "description": "Street"
+            },
+            "city": {
+              "type": "string",
+              "description": "City"
+            },
+            "state": {
+              "type": "string",
+              "description": "2-letter state code"
+            },
+            "code": {
+              "type": "string",
+              "description": "ZIP code as string"
+            },
+            "country": {
+              "type": "string",
+              "description": "Country name"
+            }
+          },
+          "required": []
+        }
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Tags."
+      },
+      "background": {
+        "type": "string",
+        "description": "Background info; multi-line OK."
+      },
+      "collaborators": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "description": "Collaborator user IDs; omitted IDs are removed."
+      },
+      "timeframeId": {
+        "type": "integer",
+        "description": "Timeframe ID (see listTimeframes)."
+      },
+      "deduplicate": {
+        "type": "boolean",
+        "description": "true = if email/phone matches, return that person unchanged (200). Default false."
+      },
+      "createdAt": {
+        "type": "string",
+        "description": "Creation time, for importing historical leads."
+      },
+      "source": {
+        "type": "string",
+        "description": "Lead source. Can only be set at creation."
+      },
+      "sourceUrl": {
+        "type": "string",
+        "description": "Link to record at lead provider. Creation only."
+      }
     },
-    "required": []
+    "required": [],
+    "additionalProperties": true
   }
 },
 {
   "name": "getPerson",
-  "description": "Get a single person by ID",
+  "description": "Get one person by ID. Pass fields=allFields or allCustom to include custom fields.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Person ID" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return. Include custom field names (e.g. customClosingDate) to guarantee custom fields appear in the response" }
+      "id": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated fields; allFields = everything, allCustom = all custom fields."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "updatePerson",
-  "description": "Update an existing person in FUB. Custom fields are supported: include them as additional top-level keys prefixed with 'custom' (e.g. customClosingDate) — run listCustomFields to see this account's field names. Set a custom field to JSON null to clear it (the string 'null' would be stored literally).",
+  "description": "Update a person. tags replaces all tags unless mergeTags=true; phones replaces all numbers. Custom fields: top-level 'custom*' keys; JSON null clears one. source/sourceUrl cannot be changed.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Person ID to update" },
-      "mergeTags": { "type": "boolean", "description": "Merge tags instead of replacing (query param)" },
-      "firstName": { "type": "string", "description": "First name" },
-      "lastName": { "type": "string", "description": "Last name" },
-      "stage": { "type": "string", "description": "Pipeline stage" },
-      "contacted": { "type": "boolean", "description": "Contacted status" },
-      "price": { "type": "number", "description": "Price point" },
-      "assignedTo": { "type": "string", "description": "Assigned agent name" },
-      "assignedUserId": { "type": "number", "description": "Assigned user ID" },
-      "assignedPondId": { "type": "number", "description": "Assigned pond ID" },
-      "assignedLenderName": { "type": "string", "description": "Assigned lender name" },
-      "assignedLenderId": { "type": "number", "description": "Assigned lender ID" },
-      "emails": { "type": "array", "description": "Email addresses: [{value, type}]", "items": { "type": "object" } },
-      "phones": { "type": "array", "description": "Phone numbers: [{value, type}]", "items": { "type": "object" } },
-      "addresses": { "type": "array", "description": "Addresses: [{street, city, state, code, type}]", "items": { "type": "object" } },
-      "tags": { "type": "array", "description": "Tags", "items": { "type": "string" } },
-      "background": { "type": "string", "description": "Background info" },
-      "timeframeId": { "type": "number", "description": "Timeframe ID" }
+      "firstName": {
+        "type": "string",
+        "description": "First name."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name."
+      },
+      "stage": {
+        "type": "string",
+        "description": "Stage name. Default Lead on create."
+      },
+      "contacted": {
+        "type": "boolean",
+        "description": "true also pauses action plans."
+      },
+      "price": {
+        "type": "integer",
+        "description": "Price point."
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Assigned agent full name."
+      },
+      "assignedUserId": {
+        "type": "integer",
+        "description": "Assigned user ID."
+      },
+      "assignedPondId": {
+        "type": "integer",
+        "description": "Assigned pond ID."
+      },
+      "assignedLenderName": {
+        "type": "string",
+        "description": "Lender full name."
+      },
+      "assignedLenderId": {
+        "type": "integer",
+        "description": "Lender user ID."
+      },
+      "emails": {
+        "type": "array",
+        "description": "Emails. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. work, home"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "phones": {
+        "type": "array",
+        "description": "Phones. REPLACES all existing numbers (incl. relationship ones); resend ones to keep.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Phone number, e.g. 888-555-1234"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. mobile, home, fax"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "addresses": {
+        "type": "array",
+        "description": "Contact addresses (not property addresses).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "home (default), work, mailing, investment"
+            },
+            "street": {
+              "type": "string",
+              "description": "Street"
+            },
+            "city": {
+              "type": "string",
+              "description": "City"
+            },
+            "state": {
+              "type": "string",
+              "description": "2-letter state code"
+            },
+            "code": {
+              "type": "string",
+              "description": "ZIP code as string"
+            },
+            "country": {
+              "type": "string",
+              "description": "Country name"
+            }
+          },
+          "required": []
+        }
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Tags."
+      },
+      "background": {
+        "type": "string",
+        "description": "Background info; multi-line OK."
+      },
+      "timeframeId": {
+        "type": "integer",
+        "description": "Timeframe ID (see listTimeframes)."
+      },
+      "collaborators": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "description": "Collaborator user IDs; omitted IDs are removed."
+      },
+      "id": {
+        "type": "integer",
+        "description": "Person ID to update."
+      },
+      "mergeTags": {
+        "type": "boolean",
+        "description": "true = add tags to existing; otherwise tags REPLACES all tags."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true
   }
 },
 {
   "name": "deletePerson",
-  "description": "Delete (trash) a person by ID",
+  "description": "Delete a person by ID. Docs do not say whether this is a soft or permanent delete.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Person ID to delete" }
+      "id": {
+        "type": "integer",
+        "description": "Person ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -548,17 +1266,37 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updatePersonAttachment",
-  "description": "Update a person attachment",
+  "description": "Update a person attachment (externally hosted file). Needs registered-system credentials (X-System headers).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Attachment ID" },
-      "personId": { "type": "number", "description": "Person ID" },
-      "uri": { "type": "string", "description": "File URI" },
-      "fileName": { "type": "string", "description": "File name" },
-      "fileSize": { "type": "number", "description": "File size" }
+      "id": {
+        "type": "integer",
+        "description": "Attachment ID."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "uri": {
+        "type": "string",
+        "description": "Link to externally hosted file."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "File name."
+      },
+      "fileSize": {
+        "type": "integer",
+        "description": "Size in bytes."
+      }
     },
-    "required": ["id", "personId", "uri", "fileName"]
+    "required": [
+      "id",
+      "personId",
+      "uri",
+      "fileName"
+    ]
   }
 },
 {
@@ -576,32 +1314,161 @@ export const TOOL_DEFINITIONS = [
 // ==================== PEOPLE RELATIONSHIPS ====================
 {
   "name": "listRelationships",
-  "description": "List relationships for a person",
+  "description": "List relationship contacts (spouse, partner, etc.), optionally for one person or by name.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field.",
+        "enum": [
+          "id",
+          "created",
+          "updated",
+          "name",
+          "firstName",
+          "lastName",
+          "personId"
+        ]
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Only relationships of this person."
+      },
+      "name": {
+        "type": "string",
+        "description": "Fuzzy name match."
+      },
+      "firstName": {
+        "type": "string",
+        "description": "Fuzzy first-name match."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Fuzzy last-name match."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createRelationship",
-  "description": "Create a relationship contact (Spouse, Brother, Partner, etc.) for an existing person. The relationship is its own contact record linked to personId — it is NOT a link between two existing people.",
+  "description": "Create a relationship contact (own record, e.g. Spouse) linked to a person. It is not a link between two existing people.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID this relationship is associated with" },
-      "firstName": { "type": "string", "description": "First name of the relationship contact" },
-      "lastName": { "type": "string", "description": "Last name of the relationship contact" },
-      "type": { "type": "string", "description": "Relationship type (e.g. Spouse, Brother, Partner)" },
-      "emails": { "type": "array", "description": "Email addresses [{type, value}]", "items": { "type": "object" } },
-      "phones": { "type": "array", "description": "Phone numbers [{type, value}]", "items": { "type": "object" } },
-      "addresses": { "type": "array", "description": "Mailing addresses [{type, street, city, state, code, country}]", "items": { "type": "object" } }
+      "personId": {
+        "type": "integer",
+        "description": "Person this relationship belongs to."
+      },
+      "firstName": {
+        "type": "string",
+        "description": "First name."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name."
+      },
+      "type": {
+        "type": "string",
+        "description": "Relationship type, e.g. Spouse, Brother, Partner."
+      },
+      "emails": {
+        "type": "array",
+        "description": "Emails. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. work, home"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "phones": {
+        "type": "array",
+        "description": "Phones. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Phone number, e.g. 888-555-1234"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. mobile, home, fax"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "addresses": {
+        "type": "array",
+        "description": "Contact addresses (not property addresses).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "home (default), work, mailing, investment"
+            },
+            "street": {
+              "type": "string",
+              "description": "Street"
+            },
+            "city": {
+              "type": "string",
+              "description": "City"
+            },
+            "state": {
+              "type": "string",
+              "description": "2-letter state code"
+            },
+            "code": {
+              "type": "string",
+              "description": "ZIP code as string"
+            },
+            "country": {
+              "type": "string",
+              "description": "Country name"
+            }
+          },
+          "required": []
+        }
+      }
     },
-    "required": ["personId"]
+    "required": []
   }
 },
 {
@@ -617,19 +1484,112 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateRelationship",
-  "description": "Update a relationship contact",
+  "description": "Update a relationship contact. emails/phones/addresses arrays OVERWRITE existing values (empty array = unchanged). personId cannot be changed.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Relationship ID" },
-      "firstName": { "type": "string" },
-      "lastName": { "type": "string" },
-      "type": { "type": "string", "description": "Relationship type (e.g. Spouse)" },
-      "emails": { "type": "array", "items": { "type": "object" } },
-      "phones": { "type": "array", "items": { "type": "object" } },
-      "addresses": { "type": "array", "items": { "type": "object" } }
+      "id": {
+        "type": "integer",
+        "description": "Relationship ID."
+      },
+      "firstName": {
+        "type": "string",
+        "description": "First name."
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name."
+      },
+      "type": {
+        "type": "string",
+        "description": "Relationship type, e.g. Spouse."
+      },
+      "emails": {
+        "type": "array",
+        "description": "Emails. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. work, home"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "phones": {
+        "type": "array",
+        "description": "Phones. First entry becomes primary. Each needs value.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Phone number, e.g. 888-555-1234"
+            },
+            "type": {
+              "type": "string",
+              "description": "e.g. mobile, home, fax"
+            },
+            "isPrimary": {
+              "type": "boolean",
+              "description": "Not needed; first entry is primary"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "addresses": {
+        "type": "array",
+        "description": "Contact addresses (not property addresses).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "home (default), work, mailing, investment"
+            },
+            "street": {
+              "type": "string",
+              "description": "Street"
+            },
+            "city": {
+              "type": "string",
+              "description": "City"
+            },
+            "state": {
+              "type": "string",
+              "description": "2-letter state code"
+            },
+            "code": {
+              "type": "string",
+              "description": "ZIP code as string"
+            },
+            "country": {
+              "type": "string",
+              "description": "Country name"
+            }
+          },
+          "required": []
+        }
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -672,16 +1632,30 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "createNote",
-  "description": "Create a note on a person",
+  "description": "Create a note on a person.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "body": { "type": "string", "description": "Note body/content" },
-      "userId": { "type": "number", "description": "User ID who created the note" },
-      "createdAt": { "type": "string", "description": "ISO timestamp" }
+      "personId": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "subject": {
+        "type": "string",
+        "description": "Note title."
+      },
+      "body": {
+        "type": "string",
+        "description": "Note content."
+      },
+      "isHtml": {
+        "type": "boolean",
+        "description": "true = render HTML tags in body."
+      }
     },
-    "required": ["personId", "body"]
+    "required": [
+      "personId"
+    ]
   }
 },
 {
@@ -697,14 +1671,34 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateNote",
-  "description": "Update a note",
+  "description": "Update a note. Send only fields to change.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Note ID" },
-      "body": { "type": "string", "description": "Updated note body" }
+      "id": {
+        "type": "integer",
+        "description": "Note ID."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Person the note belongs to."
+      },
+      "subject": {
+        "type": "string",
+        "description": "Note title."
+      },
+      "body": {
+        "type": "string",
+        "description": "Note content."
+      },
+      "isHtml": {
+        "type": "boolean",
+        "description": "true = render HTML tags in body."
+      }
     },
-    "required": ["id", "body"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -722,35 +1716,102 @@ export const TOOL_DEFINITIONS = [
 // ==================== CALLS ====================
 {
   "name": "listCalls",
-  "description": "List calls",
+  "description": "List calls, filterable by person or phone numbers.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "personId": { "type": "number", "description": "Filter by person ID" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Calls for this person."
+      },
+      "phone": {
+        "type": "string",
+        "description": "Person's phone; matches incoming and outgoing."
+      },
+      "toNumber": {
+        "type": "string",
+        "description": "Number called."
+      },
+      "fromNumber": {
+        "type": "string",
+        "description": "Number called from."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createCall",
-  "description": "Log a call for a person. FUB expects isIncoming (boolean) and note (singular).",
+  "description": "Log a call on a person. personId, phone, and isIncoming are required. userId can only be set by administrators (defaults to API user).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "phone": { "type": "string", "description": "Phone number on the call" },
-      "isIncoming": { "type": "boolean", "description": "true = inbound, false = outbound" },
-      "duration": { "type": "number", "description": "Call duration in seconds" },
-      "note": { "type": "string", "description": "Call note" },
-      "outcome": { "type": "string", "description": "Call outcome" },
-      "userId": { "type": "number", "description": "User who made the call" },
-      "toNumber": { "type": "string", "description": "Destination number" },
-      "fromNumber": { "type": "string", "description": "Originating number" }
+      "personId": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone number on the call."
+      },
+      "isIncoming": {
+        "type": "boolean",
+        "description": "true = incoming, false = outgoing."
+      },
+      "note": {
+        "type": "string",
+        "description": "Call log message."
+      },
+      "outcome": {
+        "type": "string",
+        "description": "Call outcome.",
+        "enum": [
+          "Interested",
+          "Not Interested",
+          "Left Message",
+          "No Answer",
+          "Busy",
+          "Bad Number"
+        ]
+      },
+      "duration": {
+        "type": "integer",
+        "description": "Seconds."
+      },
+      "toNumber": {
+        "type": "string",
+        "description": "Number called."
+      },
+      "fromNumber": {
+        "type": "string",
+        "description": "Number called from."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "User who took the call; admin only."
+      },
+      "recordingUrl": {
+        "type": "string",
+        "description": "URL of the call recording."
+      }
     },
-    "required": ["personId"]
+    "required": [
+      "personId",
+      "phone",
+      "isIncoming"
+    ]
   }
 },
 {
@@ -766,63 +1827,165 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateCall",
-  "description": "Update a call record",
+  "description": "Update a call record. Only calls created by the same API system/account can be updated.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Call ID" },
-      "personId": { "type": "number", "description": "Person ID" },
-      "phone": { "type": "string", "description": "Phone number" },
-      "isIncoming": { "type": "boolean", "description": "true = inbound" },
-      "duration": { "type": "number", "description": "Duration" },
-      "userId": { "type": "number", "description": "User ID" },
-      "note": { "type": "string", "description": "Note" },
-      "outcome": { "type": "string", "description": "Outcome" },
-      "toNumber": { "type": "string" },
-      "fromNumber": { "type": "string" }
+      "id": {
+        "type": "integer",
+        "description": "Call ID."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone number."
+      },
+      "isIncoming": {
+        "type": "boolean",
+        "description": "true = incoming."
+      },
+      "duration": {
+        "type": "integer",
+        "description": "Seconds."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "User ID; admin only."
+      },
+      "note": {
+        "type": "string",
+        "description": "Call log message."
+      },
+      "outcome": {
+        "type": "string",
+        "description": "Call outcome.",
+        "enum": [
+          "Interested",
+          "Not Interested",
+          "Left Message",
+          "No Answer",
+          "Busy",
+          "Bad Number"
+        ]
+      },
+      "toNumber": {
+        "type": "string",
+        "description": "Number called."
+      },
+      "fromNumber": {
+        "type": "string",
+        "description": "Number called from."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 
 // ==================== TEXT MESSAGES ====================
 {
   "name": "listTextMessages",
-  "description": "List text messages. FUB REQUIRES at least one filter: personId, threadId, phone, toNumber, fromNumber, sharedInboxId, groupTextId, participants, or id list. Unfiltered calls return 400.",
+  "description": "List text messages for a person or phone number. Filter by personId, toNumber, or fromNumber.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "personId": { "type": "number", "description": "Filter by person ID" },
-      "threadId": { "type": "string", "description": "Filter by thread ID" },
-      "phone": { "type": "string", "description": "Filter by phone" },
-      "toNumber": { "type": "string", "description": "Filter by destination number" },
-      "fromNumber": { "type": "string", "description": "Filter by source number" },
-      "sharedInboxId": { "type": "number", "description": "Filter by shared inbox" },
-      "groupTextId": { "type": "number", "description": "Filter by group text" },
-      "participants": { "type": "string", "description": "Comma-separated participants" },
-      "id": { "type": "string", "description": "Comma-separated message IDs" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Messages for this person."
+      },
+      "toNumber": {
+        "type": "string",
+        "description": "Messages sent to this number."
+      },
+      "fromNumber": {
+        "type": "string",
+        "description": "Messages sent from this number."
+      },
+      "threadId": {
+        "type": "string",
+        "description": "Filter by thread ID"
+      },
+      "phone": {
+        "type": "string",
+        "description": "Filter by phone"
+      },
+      "sharedInboxId": {
+        "type": "number",
+        "description": "Filter by shared inbox"
+      },
+      "groupTextId": {
+        "type": "number",
+        "description": "Filter by group text"
+      },
+      "participants": {
+        "type": "string",
+        "description": "Comma-separated participants"
+      },
+      "id": {
+        "type": "string",
+        "description": "Comma-separated message IDs"
+      }
     },
     "required": []
   }
 },
 {
   "name": "createTextMessage",
-  "description": "LOG a text message that was already sent by your registered third-party SMS system. This endpoint does NOT actually deliver an SMS — FUB only records it as a log entry on the person. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY env vars. To actually send an SMS to a lead, do it from FUB's UI or use your SMS provider's API directly.",
+  "description": "LOG a text already sent by a registered SMS system; it does not send anything. Needs X-System credentials. personId, message, toNumber, fromNumber are all required.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId":      { "type": "number", "description": "Person ID" },
-      "message":       { "type": "string", "description": "Message body" },
-      "toNumber":      { "type": "string", "description": "Recipient phone number" },
-      "fromNumber":    { "type": "string", "description": "Sender phone number" },
-      "isIncoming":    { "type": "boolean", "description": "true = inbound to your user; default false" },
-      "externalLabel": { "type": "string", "description": "Label shown to the user (e.g. 'My SMS App')" },
-      "externalUrl":   { "type": "string", "description": "Link to view the original message in your system" }
+      "personId": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "message": {
+        "type": "string",
+        "description": "Message body."
+      },
+      "toNumber": {
+        "type": "string",
+        "description": "Recipient number."
+      },
+      "fromNumber": {
+        "type": "string",
+        "description": "Sender number."
+      },
+      "isIncoming": {
+        "type": "boolean",
+        "description": "true = from the person. Default false."
+      },
+      "externalLabel": {
+        "type": "string",
+        "description": "Byline text on the timeline."
+      },
+      "externalUrl": {
+        "type": "string",
+        "description": "Link shown in the timeline byline."
+      }
     },
-    "required": ["personId", "message"]
+    "required": [
+      "personId",
+      "message",
+      "toNumber",
+      "fromNumber"
+    ]
   }
 },
 {
@@ -840,16 +2003,60 @@ export const TOOL_DEFINITIONS = [
 // ==================== USERS ====================
 {
   "name": "listUsers",
-  "description": "List all users/agents in the account",
+  "description": "List users (agents, brokers, lenders). Filter by role, exact name, or email.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "sort": { "type": "string", "description": "Sort order" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return" },
-      "id": { "type": "string", "description": "Comma-separated user IDs" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field.",
+        "enum": [
+          "id",
+          "name",
+          "created"
+        ]
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated fields, or allFields. Add 'calling' for calling info (allFields,calling)."
+      },
+      "role": {
+        "type": "string",
+        "description": "User role.",
+        "enum": [
+          "Broker",
+          "Agent",
+          "Lender"
+        ]
+      },
+      "name": {
+        "type": "string",
+        "description": "Exact full name (no partial match)."
+      },
+      "email": {
+        "type": "string",
+        "description": "Email address."
+      },
+      "includeDeleted": {
+        "type": "boolean",
+        "description": "Include deleted users. Default false."
+      },
+      "id": {
+        "type": "string",
+        "description": "Comma-separated user IDs"
+      }
     },
     "required": []
   }
@@ -867,13 +2074,18 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "deleteUser",
-  "description": "Delete a user",
+  "description": "Delete a user by ID. Admin only. Docs page param table unreadable; a reassignTo option may exist but is unverified.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "User ID" }
+      "id": {
+        "type": "integer",
+        "description": "User ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 
@@ -908,12 +2120,41 @@ export const TOOL_DEFINITIONS = [
 // ==================== ACTION PLANS ====================
 {
   "name": "listActionPlans",
-  "description": "List all action plans",
+  "description": "List action plans. Filter by status, names, or IDs.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field, e.g. id or name."
+      },
+      "status": {
+        "type": "string",
+        "description": "Active, Deleted, or 'Active,Deleted' for both."
+      },
+      "names": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Plan names to match (names[]=...)."
+      },
+      "ids": {
+        "type": "string",
+        "description": "Comma-separated plan IDs."
+      }
     },
     "required": []
   }
@@ -960,12 +2201,39 @@ export const TOOL_DEFINITIONS = [
 // ==================== AUTOMATIONS ====================
 {
   "name": "listAutomations",
-  "description": "List all Automations 2.0 automations. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY. Account must also be on Automations 2.0.",
+  "description": "List Automations 2.0 automations. Needs registered-system credentials and Automations 2.0.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "status": {
+        "type": "string",
+        "description": "Filter by status.",
+        "enum": [
+          "Active",
+          "Disabled",
+          "Deleted"
+        ]
+      },
+      "enabledOnly": {
+        "type": "boolean",
+        "description": "Only enabled. Default false."
+      },
+      "manualOnly": {
+        "type": "boolean",
+        "description": "Only automations with a manual trigger. Default false."
+      }
     },
     "required": []
   }
@@ -983,14 +2251,40 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "listAutomationsPeople",
-  "description": "List people in Automations 2.0 automations. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY.",
+  "description": "List person/automation pairings. Needs registered-system credentials.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Filter by person" },
-      "automationId": { "type": "number", "description": "Filter by automation" },
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call. Default 10, max 100."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip. Default 0. Prefer next for deep paging."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous page."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Pairings for this person."
+      },
+      "automationId": {
+        "type": "integer",
+        "description": "Pairings for this automation."
+      },
+      "status": {
+        "type": "string",
+        "description": "Filter by run status.",
+        "enum": [
+          "Initial",
+          "Running",
+          "Paused",
+          "Completed"
+        ]
+      }
     },
     "required": []
   }
@@ -1020,14 +2314,26 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateAutomationPerson",
-  "description": "Update a person's automation status",
+  "description": "Pause or resume a person in an automation. Needs registered-system credentials.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "AutomationPerson ID" },
-      "status": { "type": "string", "description": "New status" }
+      "id": {
+        "type": "integer",
+        "description": "AutomationPerson ID."
+      },
+      "status": {
+        "type": "string",
+        "description": "Paused pauses; Running resumes.",
+        "enum": [
+          "Running",
+          "Paused"
+        ]
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 
@@ -1047,15 +2353,32 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "createTemplate",
-  "description": "Create an email template",
+  "description": "Create an email template. Merge fields (e.g. %contact_first_name%) work only in subject and body.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Template name" },
-      "subject": { "type": "string", "description": "Email subject" },
-      "body": { "type": "string", "description": "Email body HTML" }
+      "name": {
+        "type": "string",
+        "description": "Template name"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Email subject (merge fields allowed)"
+      },
+      "body": {
+        "type": "string",
+        "description": "HTML body (merge fields allowed)"
+      },
+      "isShared": {
+        "type": "boolean",
+        "description": "Share with other users in the account"
+      }
     },
-    "required": ["name", "subject", "body"]
+    "required": [
+      "name",
+      "subject",
+      "body"
+    ]
   }
 },
 {
@@ -1071,28 +2394,74 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateTemplate",
-  "description": "Update an email template",
+  "description": "Update an email template. Merge fields work only in subject and body.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Template ID" },
-      "name": { "type": "string", "description": "Name" },
-      "subject": { "type": "string", "description": "Subject" },
-      "body": { "type": "string", "description": "Body HTML" }
+      "id": {
+        "type": "number",
+        "description": "Template ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Template name"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Email subject"
+      },
+      "body": {
+        "type": "string",
+        "description": "HTML body"
+      },
+      "isShared": {
+        "type": "boolean",
+        "description": "Share with other users in the account"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "mergeTemplate",
-  "description": "Merge an email template with a person's data (mail merge)",
+  "description": "Merge an email template with a person's data and return the rendered email. Does not send anything.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "templateId": { "type": "number", "description": "Template ID" },
-      "personId": { "type": "number", "description": "Person ID" }
+      "templateId": {
+        "type": "number",
+        "description": "Email template ID"
+      },
+      "mergePersonId": {
+        "type": "number",
+        "description": "Person ID whose data fills merge fields like %contact_name%"
+      },
+      "recipients": {
+        "type": "object",
+        "description": "Recipients in the To: field. cc/bcc/from are unused by FUB.",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Recipient email"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Recipient name"
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    "required": ["templateId", "personId"]
+    "required": []
   }
 },
 {
@@ -1123,14 +2492,27 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "createTextMessageTemplate",
-  "description": "Create a text message template",
+  "description": "Create a text message template. Message text goes in `message`.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Template name" },
-      "body": { "type": "string", "description": "Message body" }
+      "name": {
+        "type": "string",
+        "description": "Template name"
+      },
+      "message": {
+        "type": "string",
+        "description": "Text message body (merge fields allowed)"
+      },
+      "isShared": {
+        "type": "boolean",
+        "description": "Share with other users in the account"
+      }
     },
-    "required": ["name", "body"]
+    "required": [
+      "name",
+      "message"
+    ]
   }
 },
 {
@@ -1146,27 +2528,72 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateTextMessageTemplate",
-  "description": "Update a text message template",
+  "description": "Update a text message template. Message text goes in `message`.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Template ID" },
-      "name": { "type": "string", "description": "Name" },
-      "body": { "type": "string", "description": "Body" }
+      "id": {
+        "type": "number",
+        "description": "Template ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Template name"
+      },
+      "message": {
+        "type": "string",
+        "description": "Text message body"
+      },
+      "isShared": {
+        "type": "boolean",
+        "description": "Share with other users in the account"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "mergeTextMessageTemplate",
-  "description": "Merge a text message template with person data",
+  "description": "Merge a text message template with a person's data and return the rendered text. Does not send anything.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "templateId": { "type": "number", "description": "Template ID" },
-      "personId": { "type": "number", "description": "Person ID" }
+      "templateId": {
+        "type": "number",
+        "description": "Text message template ID"
+      },
+      "personId": {
+        "type": "number",
+        "description": "Person ID whose data fills merge fields (docs example uses mergePersonId)"
+      },
+      "recipients": {
+        "type": "object",
+        "description": "Recipients. from is unused by FUB.",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Recipient name"
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "Recipient phone"
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    "required": ["templateId", "personId"]
+    "required": [
+      "templateId"
+    ]
   }
 },
 {
@@ -1184,94 +2611,280 @@ export const TOOL_DEFINITIONS = [
 // ==================== EMAIL MARKETING ====================
 {
   "name": "listEmEvents",
-  "description": "List email marketing events",
+  "description": "List email marketing events (delivered, opened, clicked, etc).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "type": {
+        "type": "string",
+        "enum": [
+          "delivered",
+          "open",
+          "click",
+          "bounced",
+          "soft-bounce",
+          "hard-bounce",
+          "unsubscribe",
+          "spamreport",
+          "dropped"
+        ],
+        "description": "Filter by event type"
+      },
+      "personId": {
+        "type": "number",
+        "description": "Filter by person ID"
+      },
+      "updatedAfter": {
+        "type": "string",
+        "description": "ISO date-time; events created or updated after this"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createEmEvent",
-  "description": "Create email marketing events",
+  "description": "Send email marketing events to FUB, up to 1000 per call. Recipients with no matching contact are skipped and listed in recipientsNotFound.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "campaignId": { "type": "number", "description": "Campaign ID" },
-      "events": { "type": "array", "description": "Events array: [{type, email, timestamp}]", "items": { "type": "object" } }
+      "emEvents": {
+        "type": "array",
+        "description": "Event objects (max 1000)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "delivered",
+                "open",
+                "click",
+                "bounced",
+                "soft-bounce",
+                "hard-bounce",
+                "unsubscribe",
+                "spamreport",
+                "dropped"
+              ],
+              "description": "Event type"
+            },
+            "occurred": {
+              "type": "string",
+              "description": "Date-time of the event, ISO 8601"
+            },
+            "recipient": {
+              "type": "string",
+              "description": "Recipient email address"
+            },
+            "personId": {
+              "type": "number",
+              "description": "FUB person ID of the recipient"
+            },
+            "campaignId": {
+              "type": "string",
+              "description": "Campaign id returned by createEmCampaign"
+            },
+            "userId": {
+              "type": "number",
+              "description": "Sending user ID; defaults to the API key's user"
+            },
+            "url": {
+              "type": "string",
+              "description": "URL for the campaign"
+            }
+          }
+        }
+      }
     },
-    "required": ["campaignId", "events"]
+    "required": [
+      "emEvents"
+    ]
   }
 },
 {
   "name": "listEmCampaigns",
-  "description": "List email marketing campaigns",
+  "description": "List email marketing campaigns, optionally by origin system and origin ID.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "origin": {
+        "type": "string",
+        "description": "Only campaigns from this origin system"
+      },
+      "originId": {
+        "type": "string",
+        "description": "Only the campaign with this ID in the origin system"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createEmCampaign",
-  "description": "Create an email marketing campaign",
+  "description": "Create an email marketing campaign. The origin + originId pair must be unique; never reuse it. Subject and bodyHtml support merge fields.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "origin": { "type": "string", "description": "Campaign origin" },
-      "originId": { "type": "string", "description": "Origin ID" },
-      "subject": { "type": "string", "description": "Email subject" },
-      "bodyHtml": { "type": "string", "description": "Email body HTML" }
+      "origin": {
+        "type": "string",
+        "description": "Name of the originating email marketing system"
+      },
+      "originId": {
+        "type": "string",
+        "description": "Your unique ID for the campaign in that system"
+      },
+      "name": {
+        "type": "string",
+        "description": "Campaign or template name"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Email subject (merge fields allowed)"
+      },
+      "bodyHtml": {
+        "type": "string",
+        "description": "HTML body (merge fields allowed)"
+      }
     },
-    "required": ["origin", "subject", "bodyHtml"]
+    "required": [
+      "origin",
+      "originId"
+    ]
   }
 },
 {
   "name": "updateEmCampaign",
-  "description": "Update an email marketing campaign",
+  "description": "Update an email campaign's subject or body. Only account owners and admins can do this. Merge fields are allowed.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Campaign ID" },
-      "origin": { "type": "string", "description": "Origin" },
-      "originId": { "type": "string", "description": "Origin ID" },
-      "subject": { "type": "string", "description": "Subject" },
-      "bodyHtml": { "type": "string", "description": "Body HTML" }
+      "id": {
+        "type": "number",
+        "description": "Campaign ID"
+      },
+      "origin": {
+        "type": "string",
+        "description": "Origin"
+      },
+      "originId": {
+        "type": "string",
+        "description": "Origin ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Name"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Subject (merge fields allowed)"
+      },
+      "bodyHtml": {
+        "type": "string",
+        "description": "HTML body (merge fields allowed)"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 
 // ==================== CUSTOM FIELDS ====================
 {
   "name": "listCustomFields",
-  "description": "List custom fields. Paginated (FUB defaults to 10 per page) — pass limit=100 to fetch all in one call.",
+  "description": "List custom fields. Use limit=100 to get all in one call.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Results per page (FUB default 10, max 100)" },
-      "offset": { "type": "number", "description": "Pagination offset" }
+      "label": {
+        "type": "string",
+        "description": "Find a custom field by its label"
+      },
+      "sort": {
+        "type": "string",
+        "enum": [
+          "id",
+          "name",
+          "orderWeight",
+          "-id",
+          "-name",
+          "-orderWeight"
+        ],
+        "description": "Sort field; '-' prefix = descending. Default -id"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createCustomField",
-  "description": "Create a custom field",
+  "description": "Create a custom field (account owners only). The type cannot be changed later.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Field name" },
-      "type": { "type": "string", "description": "Field type (text, number, dropdown, etc)" },
-      "options": { "type": "array", "description": "Options for dropdown fields", "items": { "type": "string" } }
+      "label": {
+        "type": "string",
+        "description": "User-facing field name, e.g. Anniversary"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "text",
+          "date",
+          "number",
+          "dropdown"
+        ],
+        "description": "Field type; fixed after creation"
+      },
+      "choices": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Options for a dropdown field"
+      },
+      "isRecurring": {
+        "type": "boolean",
+        "description": "Date fields only: recurs yearly (birthdays). Default false"
+      },
+      "hideIfEmpty": {
+        "type": "boolean",
+        "description": "Hide on the person view when empty. Default false"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort weight. Default 0"
+      }
     },
-    "required": ["name", "type"]
+    "required": [
+      "label",
+      "type"
+    ]
   }
 },
 {
@@ -1287,16 +2900,41 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateCustomField",
-  "description": "Update a custom field",
+  "description": "Update a custom field (account owners only). The type cannot be changed; delete and recreate instead.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Custom field ID" },
-      "name": { "type": "string", "description": "Name" },
-      "type": { "type": "string", "description": "Type" },
-      "options": { "type": "array", "description": "Options", "items": { "type": "string" } }
+      "id": {
+        "type": "number",
+        "description": "Custom field ID"
+      },
+      "label": {
+        "type": "string",
+        "description": "User-facing field name"
+      },
+      "choices": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Options for a dropdown field"
+      },
+      "isRecurring": {
+        "type": "boolean",
+        "description": "Date fields only: recurs yearly"
+      },
+      "hideIfEmpty": {
+        "type": "boolean",
+        "description": "Hide on the person view when empty"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort weight"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1314,27 +2952,53 @@ export const TOOL_DEFINITIONS = [
 // ==================== STAGES ====================
 {
   "name": "listStages",
-  "description": "List all pipeline stages. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List pipeline stages. Default sort is orderWeight.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "sort": {
+        "type": "string",
+        "enum": [
+          "orderWeight",
+          "id",
+          "name"
+        ],
+        "description": "Sort field. Default orderWeight"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createStage",
-  "description": "Create a pipeline stage",
+  "description": "Create a stage. orderWeight defaults to 1000; FUB then renumbers all stages in steps of 1000.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Stage name" },
-      "pipelineId": { "type": "number", "description": "Pipeline ID" }
+      "name": {
+        "type": "string",
+        "description": "Stage name"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position. Default 1000"
+      }
     },
-    "required": ["name"]
+    "required": [
+      "name"
+    ]
   }
 },
 {
@@ -1350,14 +3014,26 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateStage",
-  "description": "Update a stage",
+  "description": "Update a stage's name or position. Stages with isProtected=true cannot be renamed. FUB renumbers all stage weights in steps of 1000.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Stage ID" },
-      "name": { "type": "string", "description": "Stage name" }
+      "id": {
+        "type": "number",
+        "description": "Stage ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Stage name (not allowed if isProtected)"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["id", "name"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1375,32 +3051,130 @@ export const TOOL_DEFINITIONS = [
 // ==================== TASKS ====================
 {
   "name": "listTasks",
-  "description": "List tasks",
+  "description": "List tasks. Use due=overdue for overdue tasks, due=today for today's, assignedUserId for one user's tasks, personId for one contact's. Add isCompleted=false for open tasks only. Filters combine.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "sort": { "type": "string", "description": "Sort order" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return" }
+      "personId": {
+        "type": "number",
+        "description": "Tasks for this person ID"
+      },
+      "assignedUserId": {
+        "type": "number",
+        "description": "Tasks assigned to this user ID"
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Tasks assigned to this user's full name"
+      },
+      "name": {
+        "type": "string",
+        "description": "Tasks whose name contains this text"
+      },
+      "type": {
+        "type": "string",
+        "description": "Task type; comma-separated list. Values: Follow Up, Call, Email, Text, Appointment, Showing, Closing, Open House, Thank You"
+      },
+      "isCompleted": {
+        "type": "boolean",
+        "description": "true = completed only, false = open only"
+      },
+      "due": {
+        "type": "string",
+        "enum": [
+          "today",
+          "overdue",
+          "upcoming"
+        ],
+        "description": "Due-date bucket"
+      },
+      "dueStart": {
+        "type": "string",
+        "description": "ISO date-time; tasks due from this time"
+      },
+      "dueEnd": {
+        "type": "string",
+        "description": "ISO date-time; tasks due at or before this time"
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort order"
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated fields to return"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createTask",
-  "description": "Create a task",
+  "description": "Create a task on a person. personId is required, and one of assignedUserId or assignedTo is required. dueDate is YYYY-MM-DD; use dueDateTime for a specific time.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "personId": { "type": "number", "description": "Person ID" },
-      "name": { "type": "string", "description": "Task name" },
-      "dueDate": { "type": "string", "description": "Due date ISO" },
-      "assignedUserId": { "type": "number", "description": "Assigned user ID" },
-      "status": { "type": "string", "description": "Task status" }
+      "personId": {
+        "type": "number",
+        "description": "Person the task relates to"
+      },
+      "assignedUserId": {
+        "type": "number",
+        "description": "User ID to assign"
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Full name of the user to assign"
+      },
+      "name": {
+        "type": "string",
+        "description": "Task name"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "Follow Up",
+          "Call",
+          "Email",
+          "Text",
+          "Appointment",
+          "Showing",
+          "Closing",
+          "Open House",
+          "Thank You"
+        ],
+        "description": "Task category"
+      },
+      "isCompleted": {
+        "type": "boolean",
+        "description": "Mark completed or not"
+      },
+      "dueDate": {
+        "type": "string",
+        "description": "Due date, YYYY-MM-DD"
+      },
+      "dueDateTime": {
+        "type": "string",
+        "description": "Due date-time with optional offset, e.g. 2026-11-02T15:00:00-05:00"
+      },
+      "remindSecondsBefore": {
+        "type": "number",
+        "description": "Reminder lead time in seconds; only for tasks with a due time"
+      }
     },
-    "required": ["name"]
+    "required": []
   }
 },
 {
@@ -1416,18 +3190,65 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateTask",
-  "description": "Update a task",
+  "description": "Update a task. Mark done with isCompleted=true. dueDate is YYYY-MM-DD; use dueDateTime for a specific time.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Task ID" },
-      "personId": { "type": "number", "description": "Person ID" },
-      "name": { "type": "string", "description": "Name" },
-      "dueDate": { "type": "string", "description": "Due date" },
-      "assignedUserId": { "type": "number", "description": "Assigned user" },
-      "status": { "type": "string", "description": "Status" }
+      "id": {
+        "type": "number",
+        "description": "Task ID"
+      },
+      "personId": {
+        "type": "number",
+        "description": "Person the task relates to"
+      },
+      "assignedUserId": {
+        "type": "number",
+        "description": "User ID to assign"
+      },
+      "assignedTo": {
+        "type": "string",
+        "description": "Full name of the user to assign"
+      },
+      "name": {
+        "type": "string",
+        "description": "Task name"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "Follow Up",
+          "Call",
+          "Email",
+          "Text",
+          "Appointment",
+          "Showing",
+          "Closing",
+          "Open House",
+          "Thank You"
+        ],
+        "description": "Task category"
+      },
+      "isCompleted": {
+        "type": "boolean",
+        "description": "Mark completed or not"
+      },
+      "dueDate": {
+        "type": "string",
+        "description": "Due date, YYYY-MM-DD"
+      },
+      "dueDateTime": {
+        "type": "string",
+        "description": "Due date-time with optional offset, e.g. 2026-11-02T15:00:00-05:00"
+      },
+      "remindSecondsBefore": {
+        "type": "number",
+        "description": "Reminder lead time in seconds; only for tasks with a due time"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1445,36 +3266,119 @@ export const TOOL_DEFINITIONS = [
 // ==================== APPOINTMENTS ====================
 {
   "name": "listAppointments",
-  "description": "List appointments",
+  "description": "List appointments. Filter by personId (comma list allowed), userId, or a start+end date range (both required together).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "personId": { "type": "number", "description": "Filter by person" }
+      "personId": {
+        "type": "string",
+        "description": "Person ID; comma-separated list allowed"
+      },
+      "userId": {
+        "type": "number",
+        "description": "Appointments for this user ID"
+      },
+      "start": {
+        "type": "string",
+        "description": "Range start (date); must be used with end"
+      },
+      "end": {
+        "type": "string",
+        "description": "Range end (date); must be used with start"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createAppointment",
-  "description": "Create an appointment. FUB uses start/end (not startTime/endTime), typeId/outcomeId (not appointmentTypeId/appointmentOutcomeId), and invitees (see below). Invitees: [{userId:int}] for a FUB user, [{personId:int}] for a contact (optional name/email). The shape {type,id} is NOT FUB's; it is auto-converted, but prefer userId/personId. This tool never sends invitation emails (sendInvitation is not sent; FUB's default is off), but FUB syncs appointments to Google/Outlook calendars for invitees, so a person invitee may still get a calendar invite from the calendar side.",
+  "description": "Create an appointment. Use start/end (UTC; offset suffix allowed), typeId/outcomeId, invitees [{userId}] or [{personId}]. sendInvitation=true emails invitees (SMS too if reminders are on); default false.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "title": { "type": "string", "description": "Appointment title (required)" },
-      "start": { "type": "string", "description": "Start ISO 8601 (required)" },
-      "end": { "type": "string", "description": "End ISO 8601 (required)" },
-      "description": { "type": "string", "description": "Description" },
-      "invitees": { "type": "array", "description": "Array of {userId:int} (FUB user) and/or {personId:int} (contact)", "items": { "type": "object" } },
-      "allDay": { "type": "boolean" },
-      "location": { "type": "string", "description": "Location" },
-      "typeId": { "type": "number", "description": "Appointment type ID" },
-      "outcomeId": { "type": "number", "description": "Appointment outcome ID" },
-      "createdById": { "type": "number", "description": "Creator user ID (admin only)" }
+      "title": {
+        "type": "string",
+        "description": "Appointment title"
+      },
+      "start": {
+        "type": "string",
+        "description": "Start, ISO 8601 UTC or with offset"
+      },
+      "end": {
+        "type": "string",
+        "description": "End, ISO 8601 UTC or with offset"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "invitees": {
+        "type": "array",
+        "description": "People/users to invite: [{userId}] for a user, [{personId}] for a contact (optional name, email).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "number",
+              "description": "FUB user ID"
+            },
+            "personId": {
+              "type": "number",
+              "description": "FUB person ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Display name"
+            },
+            "email": {
+              "type": "string",
+              "description": "Email (people)"
+            }
+          }
+        }
+      },
+      "allDay": {
+        "type": "boolean",
+        "description": "All-day event. Default false"
+      },
+      "location": {
+        "type": "string",
+        "description": "Location or address"
+      },
+      "typeId": {
+        "type": "number",
+        "description": "Appointment type ID (see listAppointmentTypes)"
+      },
+      "outcomeId": {
+        "type": "number",
+        "description": "Appointment outcome ID (see listAppointmentOutcomes)"
+      },
+      "createdById": {
+        "type": "number",
+        "description": "Creator user ID; admins only"
+      },
+      "sendInvitation": {
+        "type": "boolean",
+        "description": "Query param: email invitees. Default false"
+      }
     },
-    "required": ["title", "start", "end"]
+    "required": [
+      "title",
+      "start",
+      "end"
+    ]
   }
 },
 {
@@ -1523,26 +3427,54 @@ export const TOOL_DEFINITIONS = [
 // ==================== APPOINTMENT TYPES ====================
 {
   "name": "listAppointmentTypes",
-  "description": "List appointment types. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List appointment types. Default sort is orderWeight.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "sort": {
+        "type": "string",
+        "enum": [
+          "id",
+          "name",
+          "orderWeight",
+          "-id",
+          "-name",
+          "-orderWeight"
+        ],
+        "description": "Sort field; '-' prefix = descending. Default orderWeight"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createAppointmentType",
-  "description": "Create an appointment type",
+  "description": "Create an appointment type (account owner only).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Type name" }
+      "name": {
+        "type": "string",
+        "description": "Type name"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["name"]
+    "required": []
   }
 },
 {
@@ -1558,14 +3490,26 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateAppointmentType",
-  "description": "Update an appointment type",
+  "description": "Update an appointment type (account owner only).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Type ID" },
-      "name": { "type": "string", "description": "Name" }
+      "id": {
+        "type": "number",
+        "description": "Type ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Name"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["id", "name"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1583,26 +3527,54 @@ export const TOOL_DEFINITIONS = [
 // ==================== APPOINTMENT OUTCOMES ====================
 {
   "name": "listAppointmentOutcomes",
-  "description": "List appointment outcomes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List appointment outcomes. Default sort is orderWeight.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "sort": {
+        "type": "string",
+        "enum": [
+          "id",
+          "name",
+          "orderWeight",
+          "-id",
+          "-name",
+          "-orderWeight"
+        ],
+        "description": "Sort field; '-' prefix = descending. Default orderWeight"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createAppointmentOutcome",
-  "description": "Create an appointment outcome",
+  "description": "Create an appointment outcome (account owner only).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Outcome name" }
+      "name": {
+        "type": "string",
+        "description": "Outcome name"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["name"]
+    "required": []
   }
 },
 {
@@ -1618,14 +3590,26 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateAppointmentOutcome",
-  "description": "Update an appointment outcome",
+  "description": "Update an appointment outcome (account owner only).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Outcome ID" },
-      "name": { "type": "string", "description": "Name" }
+      "id": {
+        "type": "number",
+        "description": "Outcome ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Name"
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["id", "name"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1643,51 +3627,222 @@ export const TOOL_DEFINITIONS = [
 // ==================== WEBHOOKS ====================
 {
   "name": "listWebhooks",
-  "description": "List all webhooks. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List webhooks. Account owner or registered system only. Filter by event or status.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "event": {
+        "type": "string",
+        "enum": [
+          "peopleCreated",
+          "peopleUpdated",
+          "peopleDeleted",
+          "peopleTagsCreated",
+          "peopleStageUpdated",
+          "peopleRelationshipCreated",
+          "peopleRelationshipUpdated",
+          "peopleRelationshipDeleted",
+          "notesCreated",
+          "notesUpdated",
+          "notesDeleted",
+          "emEventsOpened",
+          "emEventsClicked",
+          "emEventsUnsubscribed",
+          "tasksCreated",
+          "tasksUpdated",
+          "tasksDeleted",
+          "appointmentsCreated",
+          "appointmentsUpdated",
+          "appointmentsDeleted",
+          "textMessagesCreated",
+          "textMessagesUpdated",
+          "textMessagesDeleted",
+          "callsCreated",
+          "callsUpdated",
+          "callsDeleted",
+          "dealsCreated",
+          "dealsUpdated",
+          "dealsDeleted",
+          "emailsCreated",
+          "emailsUpdated",
+          "emailsDeleted",
+          "eventsCreated",
+          "stageCreated",
+          "stageUpdated",
+          "stageDeleted"
+        ],
+        "description": "Only webhooks for this event"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Active",
+          "Disabled"
+        ],
+        "description": "Only webhooks with this status"
+      },
+      "sort": {
+        "type": "string",
+        "enum": [
+          "id",
+          "created",
+          "updated",
+          "status",
+          "event"
+        ],
+        "description": "Sort field. Default created"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createWebhook",
-  "description": "Create a webhook",
+  "description": "Create a webhook for one event. url must be https. Account owner or registered system only.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "event": { "type": "string", "description": "Webhook event type" },
-      "url": { "type": "string", "description": "Callback URL" }
+      "event": {
+        "type": "string",
+        "enum": [
+          "peopleCreated",
+          "peopleUpdated",
+          "peopleDeleted",
+          "peopleTagsCreated",
+          "peopleStageUpdated",
+          "peopleRelationshipCreated",
+          "peopleRelationshipUpdated",
+          "peopleRelationshipDeleted",
+          "notesCreated",
+          "notesUpdated",
+          "notesDeleted",
+          "emEventsOpened",
+          "emEventsClicked",
+          "emEventsUnsubscribed",
+          "tasksCreated",
+          "tasksUpdated",
+          "tasksDeleted",
+          "appointmentsCreated",
+          "appointmentsUpdated",
+          "appointmentsDeleted",
+          "textMessagesCreated",
+          "textMessagesUpdated",
+          "textMessagesDeleted",
+          "callsCreated",
+          "callsUpdated",
+          "callsDeleted",
+          "dealsCreated",
+          "dealsUpdated",
+          "dealsDeleted",
+          "emailsCreated",
+          "emailsUpdated",
+          "emailsDeleted",
+          "eventsCreated",
+          "stageCreated",
+          "stageUpdated",
+          "stageDeleted"
+        ],
+        "description": "Event the webhook fires on"
+      },
+      "url": {
+        "type": "string",
+        "description": "Callback URL; must be https"
+      }
     },
-    "required": ["event", "url"]
+    "required": [
+      "event",
+      "url"
+    ]
   }
 },
 {
   "name": "getWebhook",
-  "description": "Get a webhook by ID",
+  "description": "Get a webhook by ID. Account owner or registered system only.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Webhook ID" }
+      "id": {
+        "type": "number",
+        "description": "Webhook ID"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "updateWebhook",
-  "description": "Update a webhook",
+  "description": "Update a webhook. url must be https. Account owner or registered system only.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Webhook ID" },
-      "event": { "type": "string", "description": "Event type" },
-      "url": { "type": "string", "description": "Callback URL" }
+      "id": {
+        "type": "number",
+        "description": "Webhook ID"
+      },
+      "event": {
+        "type": "string",
+        "enum": [
+          "peopleCreated",
+          "peopleUpdated",
+          "peopleDeleted",
+          "peopleTagsCreated",
+          "peopleStageUpdated",
+          "peopleRelationshipCreated",
+          "peopleRelationshipUpdated",
+          "peopleRelationshipDeleted",
+          "notesCreated",
+          "notesUpdated",
+          "notesDeleted",
+          "emEventsOpened",
+          "emEventsClicked",
+          "emEventsUnsubscribed",
+          "tasksCreated",
+          "tasksUpdated",
+          "tasksDeleted",
+          "appointmentsCreated",
+          "appointmentsUpdated",
+          "appointmentsDeleted",
+          "textMessagesCreated",
+          "textMessagesUpdated",
+          "textMessagesDeleted",
+          "callsCreated",
+          "callsUpdated",
+          "callsDeleted",
+          "dealsCreated",
+          "dealsUpdated",
+          "dealsDeleted",
+          "emailsCreated",
+          "emailsUpdated",
+          "emailsDeleted",
+          "eventsCreated",
+          "stageCreated",
+          "stageUpdated",
+          "stageDeleted"
+        ],
+        "description": "Event the webhook fires on"
+      },
+      "url": {
+        "type": "string",
+        "description": "Callback URL; must be https"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1703,39 +3858,107 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "getWebhookEvents",
-  "description": "Get events for a webhook",
+  "description": "Get the events delivered for a webhook (id, eventCreated, event, resourceIds, uri). Account owner or registered system only.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Webhook ID" }
+      "id": {
+        "type": "number",
+        "description": "Webhook ID"
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 
 // ==================== PIPELINES ====================
 {
   "name": "listPipelines",
-  "description": "List all pipelines. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List pipelines, optionally by exact name.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "name": {
+        "type": "string",
+        "description": "Exact pipeline name to look up"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Results to return. FUB default 10, max 100."
+      },
+      "offset": {
+        "type": "number",
+        "description": "Rows to skip before results begin. Default 0."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createPipeline",
-  "description": "Create a pipeline",
+  "description": "Create a pipeline with optional stages (account owner only). Each stage needs name and closedStage.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Pipeline name" }
+      "name": {
+        "type": "string",
+        "description": "Pipeline name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Pipeline description"
+      },
+      "stages": {
+        "type": "array",
+        "description": "Stages. Include id to update an existing stage; omit id to create one.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number",
+              "description": "Existing stage ID (update only)"
+            },
+            "name": {
+              "type": "string",
+              "description": "Stage name"
+            },
+            "closedStage": {
+              "type": "boolean",
+              "description": "True if a closed stage"
+            },
+            "description": {
+              "type": "string",
+              "description": "Stage description"
+            },
+            "orderWeight": {
+              "type": "number",
+              "description": "Sort position"
+            },
+            "color": {
+              "type": "string",
+              "description": "Hex color, e.g. #FFFFFF"
+            }
+          },
+          "required": [
+            "name",
+            "closedStage"
+          ]
+        }
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["name"]
+    "required": [
+      "name"
+    ]
   }
 },
 {
@@ -1751,14 +3974,67 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updatePipeline",
-  "description": "Update a pipeline",
+  "description": "Update a pipeline and its stages (owner only). Stages with id are updated, without id are created.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Pipeline ID" },
-      "name": { "type": "string", "description": "Name" }
+      "id": {
+        "type": "number",
+        "description": "Pipeline ID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Pipeline name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Pipeline description"
+      },
+      "stages": {
+        "type": "array",
+        "description": "Stages. Include id to update an existing stage; omit id to create one.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number",
+              "description": "Existing stage ID (update only)"
+            },
+            "name": {
+              "type": "string",
+              "description": "Stage name"
+            },
+            "closedStage": {
+              "type": "boolean",
+              "description": "True if a closed stage"
+            },
+            "description": {
+              "type": "string",
+              "description": "Stage description"
+            },
+            "orderWeight": {
+              "type": "number",
+              "description": "Sort position"
+            },
+            "color": {
+              "type": "string",
+              "description": "Hex color, e.g. #FFFFFF"
+            }
+          },
+          "required": [
+            "name",
+            "closedStage"
+          ]
+        }
+      },
+      "orderWeight": {
+        "type": "number",
+        "description": "Sort position"
+      }
     },
-    "required": ["id", "name"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1776,51 +4052,159 @@ export const TOOL_DEFINITIONS = [
 // ==================== DEALS ====================
 {
   "name": "listDeals",
-  "description": "List deals with filtering",
+  "description": "List deals, filtered by pipeline, user, person or status. Archived and Deleted deals are hidden unless includeArchived=1 or includeDeleted=1. Use getDeal for one deal by ID.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Maximum number of results to return" },
-      "offset": { "type": "number", "description": "Offset for pagination" },
-      "next": { "type": "string", "description": "Cursor for next page of results" },
-      "sort": { "type": "string", "description": "Sort order" },
-      "fields": { "type": "string", "description": "Comma-separated list of fields to return" },
-      "id": { "type": "string", "description": "Comma-separated deal IDs" },
-      "pipelineId": { "type": "number", "description": "Filter by pipeline" },
-      "stageId": { "type": "number", "description": "Filter by stage (numeric stage ID)" },
-      "personId": { "type": "number", "description": "Return deals linked to a specific person" },
-      "userId": { "type": "number", "description": "Return deals assigned to a specific user" },
-      "includeArchived": { "type": "integer", "enum": [0, 1], "description": "Set to 1 to include deals with status Archived (default 0)" },
-      "includeDeleted": { "type": "integer", "enum": [0, 1], "description": "Set to 1 to include deals with status Deleted (default 0)" },
-      "status": { "type": "string", "enum": ["Active", "Archived"], "description": "Only return deals with this status. For deleted deals use includeDeleted=1 (the API's \"Deleted\" value does not filter — it returns all statuses)." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Not set by server; FUB default is 10 when omitted."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field; prefix with - for descending."
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated list of fields to return."
+      },
+      "pipelineId": {
+        "type": "integer",
+        "description": "Return deals for this pipeline only."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "Return deals for this user."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "Return deals for this person."
+      },
+      "includeArchived": {
+        "type": "integer",
+        "description": "Set to 1 to include deals with status Archived."
+      },
+      "includeDeleted": {
+        "type": "integer",
+        "description": "Set to 1 to include deals with status Deleted."
+      },
+      "status": {
+        "type": "string",
+        "description": "Only return deals with this status. To see Deleted deals use includeDeleted=1; status=Deleted returns all statuses.",
+        "enum": [
+          "Active",
+          "Archived",
+          "Deleted"
+        ]
+      },
+      "stageId": {
+        "type": "number",
+        "description": "Filter by stage ID (from listStages). Works live although the docs omit it."
+      },
+      "id": {
+        "type": "string",
+        "description": "Comma-separated deal IDs"
+      }
     },
     "required": []
   }
 },
 {
   "name": "createDeal",
-  "description": "Create a deal. FUB expects peopleIds (array) and price (number). name + stageId required.",
+  "description": "Create a deal. name and stageId are required. Use peopleIds (array) and price (whole number); do not use personId or value. Custom field values may be passed as extra properties (e.g. customField1).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Deal name" },
-      "stageId": { "type": "number", "description": "Stage ID (required)" },
-      "description": { "type": "string", "description": "Deal description" },
-      "peopleIds": { "type": "array", "description": "Person IDs on the deal", "items": { "type": "number" } },
-      "userIds": { "type": "array", "description": "Assigned user IDs", "items": { "type": "number" } },
-      "price": { "type": "number", "description": "Deal price" },
-      "projectedCloseDate": { "type": "string", "description": "Projected close date" },
-      "orderWeight": { "type": "number", "description": "Sort order weight" },
-      "commissionValue": { "type": "number" },
-      "agentCommission": { "type": "number" },
-      "teamCommission": { "type": "number" },
-      "earnestMoneyDueDate": { "type": "string" },
-      "mutualAcceptanceDate": { "type": "string" },
-      "dueDiligenceDate": { "type": "string" },
-      "finalWalkThroughDate": { "type": "string" },
-      "possessionDate": { "type": "string" }
+      "name": {
+        "type": "string",
+        "description": "Name of the deal."
+      },
+      "stageId": {
+        "type": "integer",
+        "description": "Stage the deal is assigned to."
+      },
+      "description": {
+        "type": "string",
+        "description": "Description of the deal."
+      },
+      "peopleIds": {
+        "type": "array",
+        "description": "Person IDs to include in the deal.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "userIds": {
+        "type": "array",
+        "description": "User IDs to include in the deal.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "price": {
+        "type": "integer",
+        "description": "Price associated with the deal (whole number)."
+      },
+      "projectedCloseDate": {
+        "type": "string",
+        "description": "Projected close date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "commissionValue": {
+        "type": "integer",
+        "description": "Commission value for the deal."
+      },
+      "agentCommission": {
+        "type": "integer",
+        "description": "Commission split for the agent."
+      },
+      "teamCommission": {
+        "type": "integer",
+        "description": "Commission split for the team."
+      },
+      "earnestMoneyDueDate": {
+        "type": "string",
+        "description": "Earnest money due date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "mutualAcceptanceDate": {
+        "type": "string",
+        "description": "Mutual acceptance date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "dueDiligenceDate": {
+        "type": "string",
+        "description": "Due diligence date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "finalWalkThroughDate": {
+        "type": "string",
+        "description": "Final walk-through date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "possessionDate": {
+        "type": "string",
+        "description": "Possession date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "orderWeight": {
+        "type": "integer",
+        "description": "Sets a specific sort order."
+      }
     },
-    "required": ["name", "stageId"]
+    "required": [
+      "name",
+      "stageId"
+    ],
+    "additionalProperties": true
   }
 },
 {
@@ -1836,28 +4220,91 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateDeal",
-  "description": "Update a deal. Use price (not value) and peopleIds (not personId).",
+  "description": "Update a deal by ID; send only fields to change. peopleIds and userIds replace the full list. Use peopleIds (not personId) and price (not value). Custom field values may be passed as extra properties (e.g. customField1).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Deal ID" },
-      "name": { "type": "string", "description": "Name" },
-      "stageId": { "type": "number", "description": "Stage ID" },
-      "peopleIds": { "type": "array", "description": "People on deal", "items": { "type": "number" } },
-      "userIds": { "type": "array", "description": "User IDs", "items": { "type": "number" } },
-      "price": { "type": "number", "description": "Price" },
-      "description": { "type": "string", "description": "Description" },
-      "projectedCloseDate": { "type": "string", "description": "Projected close date (YYYY-MM-DD)" },
-      "commissionValue": { "type": "integer", "description": "Total commission value" },
-      "agentCommission": { "type": "integer", "description": "Agent commission split" },
-      "teamCommission": { "type": "integer", "description": "Team commission split" },
-      "earnestMoneyDueDate": { "type": "string", "description": "Earnest money due date (YYYY-MM-DD)" },
-      "mutualAcceptanceDate": { "type": "string", "description": "Mutual acceptance date (YYYY-MM-DD)" },
-      "dueDiligenceDate": { "type": "string", "description": "Due diligence date (YYYY-MM-DD)" },
-      "finalWalkThroughDate": { "type": "string", "description": "Final walk-through date (YYYY-MM-DD)" },
-      "possessionDate": { "type": "string", "description": "Possession date (YYYY-MM-DD)" }
+      "name": {
+        "type": "string",
+        "description": "Name of the deal."
+      },
+      "stageId": {
+        "type": "integer",
+        "description": "Stage the deal is assigned to."
+      },
+      "description": {
+        "type": "string",
+        "description": "Description of the deal."
+      },
+      "peopleIds": {
+        "type": "array",
+        "description": "Person IDs to include in the deal.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "userIds": {
+        "type": "array",
+        "description": "User IDs to include in the deal.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "price": {
+        "type": "integer",
+        "description": "Price associated with the deal (whole number)."
+      },
+      "projectedCloseDate": {
+        "type": "string",
+        "description": "Projected close date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "commissionValue": {
+        "type": "integer",
+        "description": "Commission value for the deal."
+      },
+      "agentCommission": {
+        "type": "integer",
+        "description": "Commission split for the agent."
+      },
+      "teamCommission": {
+        "type": "integer",
+        "description": "Commission split for the team."
+      },
+      "earnestMoneyDueDate": {
+        "type": "string",
+        "description": "Earnest money due date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "mutualAcceptanceDate": {
+        "type": "string",
+        "description": "Mutual acceptance date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "dueDiligenceDate": {
+        "type": "string",
+        "description": "Due diligence date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "finalWalkThroughDate": {
+        "type": "string",
+        "description": "Final walk-through date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "possessionDate": {
+        "type": "string",
+        "description": "Possession date, YYYY-MM-DD.",
+        "format": "date"
+      },
+      "id": {
+        "type": "integer",
+        "description": "Deal ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true
   }
 },
 {
@@ -1875,16 +4322,32 @@ export const TOOL_DEFINITIONS = [
 // ==================== DEAL ATTACHMENTS ====================
 {
   "name": "createDealAttachment",
-  "description": "Attach an externally-hosted file to a deal. \"Restricted - Registered Systems Only\": requires FUB_SYSTEM + FUB_SYSTEM_KEY env vars. `uri` must point to an externally hosted file — FUB does NOT host uploads via this endpoint (omitting URI returns 403).",
+  "description": "Attach an externally hosted file to a deal by URI. Restricted to registered systems (needs FUB_SYSTEM and FUB_SYSTEM_KEY). FUB does not host uploads here; omitting uri returns 403.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "dealId": { "type": "number", "description": "Deal ID" },
-      "uri": { "type": "string", "description": "File URI" },
-      "fileName": { "type": "string", "description": "File name" },
-      "fileSize": { "type": "number", "description": "File size" }
+      "dealId": {
+        "type": "integer",
+        "description": "ID of the deal to attach to."
+      },
+      "uri": {
+        "type": "string",
+        "description": "URI of an externally hosted file."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "Name of the file."
+      },
+      "fileSize": {
+        "type": "integer",
+        "description": "Size of the file in bytes."
+      }
     },
-    "required": ["dealId", "uri", "fileName"]
+    "required": [
+      "dealId",
+      "uri",
+      "fileName"
+    ]
   }
 },
 {
@@ -1900,17 +4363,37 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateDealAttachment",
-  "description": "Update a deal attachment",
+  "description": "Update a deal attachment by ID. FUB requires dealId, uri and fileName on every update, even if unchanged.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Attachment ID" },
-      "dealId": { "type": "number", "description": "Deal ID" },
-      "uri": { "type": "string", "description": "URI" },
-      "fileName": { "type": "string", "description": "File name" },
-      "fileSize": { "type": "number", "description": "Size" }
+      "id": {
+        "type": "integer",
+        "description": "Attachment ID."
+      },
+      "dealId": {
+        "type": "integer",
+        "description": "ID of the deal the attachment belongs to."
+      },
+      "uri": {
+        "type": "string",
+        "description": "URI of an externally hosted file."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "Name of the file."
+      },
+      "fileSize": {
+        "type": "integer",
+        "description": "Size of the file in bytes."
+      }
     },
-    "required": ["id", "dealId", "uri", "fileName"]
+    "required": [
+      "id",
+      "dealId",
+      "uri",
+      "fileName"
+    ]
   }
 },
 {
@@ -1928,31 +4411,87 @@ export const TOOL_DEFINITIONS = [
 // ==================== DEAL CUSTOM FIELDS ====================
 {
   "name": "listDealCustomFields",
-  "description": "List deal custom fields. Paginated (FUB defaults to 10 per page) — pass limit=100 to fetch all in one call.",
+  "description": "List deal custom fields. Paginated: FUB returns 10 per page unless limit is set; pass limit=100 to get more in one call.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Results per page (FUB default 10, max 100)" },
-      "offset": { "type": "number", "description": "Pagination offset" }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Not set by server; FUB default is 10 when omitted."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field; prefix with - for descending. FUB default is id descending.",
+        "enum": [
+          "id",
+          "name",
+          "orderWeight"
+        ]
+      },
+      "label": {
+        "type": "string",
+        "description": "Find the custom field by label."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createDealCustomField",
-  "description": "Create a deal custom field. FUB expects 'label' (not 'name') and 'choices' (not 'options').",
+  "description": "Create a deal custom field. Only the account owner can do this. label and type are required; choices applies only to dropdown fields.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "label": { "type": "string", "description": "User-friendly field name" },
-      "type": { "type": "string", "description": "Field type: text, date, number, dropdown" },
-      "choices": { "type": "array", "description": "Dropdown choices (dropdown only)", "items": { "type": "string" } },
-      "isRecurring": { "type": "boolean" },
-      "hideIfEmpty": { "type": "boolean" },
-      "orderWeight": { "type": "number" },
-      "readOnly": { "type": "boolean" }
+      "label": {
+        "type": "string",
+        "description": "User-friendly name of the field (e.g. Anniversary). Use label, not name."
+      },
+      "type": {
+        "type": "string",
+        "description": "Field type.",
+        "enum": [
+          "text",
+          "date",
+          "number",
+          "dropdown"
+        ]
+      },
+      "choices": {
+        "type": "array",
+        "description": "Options for a dropdown field. Use choices, not options.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "isRecurring": {
+        "type": "boolean",
+        "description": "Date field repeats every year (e.g. birthdays). FUB default false."
+      },
+      "hideIfEmpty": {
+        "type": "boolean",
+        "description": "Hide the field when empty. FUB default false."
+      },
+      "orderWeight": {
+        "type": "integer",
+        "description": "Weight for custom sorting. FUB default 0."
+      },
+      "readOnly": {
+        "type": "boolean",
+        "description": "Field is read only. FUB default false."
+      }
     },
-    "required": ["label", "type"]
+    "required": [
+      "label",
+      "type"
+    ]
   }
 },
 {
@@ -1968,20 +4507,49 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateDealCustomField",
-  "description": "Update a deal custom field",
+  "description": "Update a deal custom field by ID. Only the account owner can do this. Send only fields to change.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Field ID" },
-      "label": { "type": "string", "description": "User-friendly field name" },
-      "type": { "type": "string", "description": "Field type" },
-      "choices": { "type": "array", "items": { "type": "string" } },
-      "isRecurring": { "type": "boolean" },
-      "hideIfEmpty": { "type": "boolean" },
-      "orderWeight": { "type": "number" },
-      "readOnly": { "type": "boolean" }
+      "label": {
+        "type": "string",
+        "description": "User-friendly name of the field (e.g. Anniversary). Use label, not name."
+      },
+      "type": {
+        "type": "string",
+        "description": "Field type: text, date, number or dropdown."
+      },
+      "choices": {
+        "type": "array",
+        "description": "Options for a dropdown field. Use choices, not options.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "isRecurring": {
+        "type": "boolean",
+        "description": "Date field repeats every year (e.g. birthdays). FUB default false."
+      },
+      "hideIfEmpty": {
+        "type": "boolean",
+        "description": "Hide the field when empty. FUB default false."
+      },
+      "orderWeight": {
+        "type": "integer",
+        "description": "Weight for custom sorting. FUB default 0."
+      },
+      "readOnly": {
+        "type": "boolean",
+        "description": "Field is read only. FUB default false."
+      },
+      "id": {
+        "type": "integer",
+        "description": "Field ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -1999,32 +4567,122 @@ export const TOOL_DEFINITIONS = [
 // ==================== GROUPS ====================
 {
   "name": "listGroups",
-  "description": "List all groups. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List lead-routing groups (not accessible to lender accounts). Returns up to 100 per call; if _metadata.next is set, call again with next.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field; prefix with - for descending.",
+        "enum": [
+          "id",
+          "name"
+        ]
+      },
+      "type": {
+        "type": "string",
+        "description": "Group type: Agent (admins and agents) or Lender (lender role users).",
+        "enum": [
+          "Agent",
+          "Lender"
+        ]
+      }
     },
     "required": []
   }
 },
 {
   "name": "listRoundRobinGroups",
-  "description": "List round robin groups",
-  "inputSchema": { "type": "object", "properties": {}, "required": [] }
-},
-{
-  "name": "createGroup",
-  "description": "Create a group",
+  "description": "List round robin groups, including each group's next round-robin user. Not accessible to lender accounts.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Group name" },
-      "userIds": { "type": "array", "description": "User IDs", "items": { "type": "number" } }
+      "type": {
+        "type": "string",
+        "description": "Group type: Agent (admins and agents) or Lender (lender role users).",
+        "enum": [
+          "Agent",
+          "Lender"
+        ]
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field; prefix with - for descending.",
+        "enum": [
+          "id",
+          "name"
+        ]
+      }
     },
-    "required": ["name"]
+    "required": []
+  }
+},
+{
+  "name": "createGroup",
+  "description": "Create a lead-routing group. Admin accounts only. name and users (user IDs) are required; the member list key is users, not userIds.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the group."
+      },
+      "users": {
+        "type": "array",
+        "description": "User IDs that are members of this group. Required by FUB.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "distribution": {
+        "type": "string",
+        "description": "Distribution model. Lender groups cannot be first-to-claim. FUB default round-robin.",
+        "enum": [
+          "first-to-claim",
+          "round-robin"
+        ]
+      },
+      "type": {
+        "type": "string",
+        "description": "Group type. FUB default Agent.",
+        "enum": [
+          "Agent",
+          "Lender"
+        ]
+      },
+      "claimWindow": {
+        "type": "integer",
+        "description": "Seconds to claim a lead in a first-to-claim group, 1 to 30 minutes. FUB default 1800."
+      },
+      "defaultGroupId": {
+        "type": "integer",
+        "description": "Group that gets unclaimed first-to-claim leads after the claim window."
+      },
+      "defaultPondId": {
+        "type": "integer",
+        "description": "Pond that gets unclaimed first-to-claim leads after the claim window."
+      },
+      "defaultUserId": {
+        "type": "integer",
+        "description": "User who gets unclaimed first-to-claim leads after the claim window."
+      }
+    },
+    "required": [
+      "name",
+      "users"
+    ]
   }
 },
 {
@@ -2040,15 +4698,61 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateGroup",
-  "description": "Update a group",
+  "description": "Update a group by ID. Admin accounts only. Send only fields to change.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Group ID" },
-      "name": { "type": "string", "description": "Name" },
-      "userIds": { "type": "array", "description": "User IDs", "items": { "type": "number" } }
+      "id": {
+        "type": "integer",
+        "description": "Group ID."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name of the group."
+      },
+      "users": {
+        "type": "array",
+        "description": "User IDs that are members of this group. Required by FUB.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "distribution": {
+        "type": "string",
+        "description": "Distribution model. Lender groups cannot be first-to-claim. FUB default round-robin.",
+        "enum": [
+          "first-to-claim",
+          "round-robin"
+        ]
+      },
+      "type": {
+        "type": "string",
+        "description": "Group type. FUB default Agent.",
+        "enum": [
+          "Agent",
+          "Lender"
+        ]
+      },
+      "claimWindow": {
+        "type": "integer",
+        "description": "Seconds to claim a lead in a first-to-claim group, 1 to 30 minutes. FUB default 1800."
+      },
+      "defaultGroupId": {
+        "type": "integer",
+        "description": "Group that gets unclaimed first-to-claim leads after the claim window."
+      },
+      "defaultPondId": {
+        "type": "integer",
+        "description": "Pond that gets unclaimed first-to-claim leads after the claim window."
+      },
+      "defaultUserId": {
+        "type": "integer",
+        "description": "User who gets unclaimed first-to-claim leads after the claim window."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -2066,27 +4770,55 @@ export const TOOL_DEFINITIONS = [
 // ==================== TEAMS ====================
 {
   "name": "listTeams",
-  "description": "List all teams. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List teams with their userIds and leaderIds. Returns up to 100 per call; if _metadata.next is set, call again with next.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createTeam",
-  "description": "Create a team",
+  "description": "Create a team. name and userIds (all member user IDs) are required; leaderIds is the complete list of team leaders. Needs team access (403 otherwise).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Team name" },
-      "description": { "type": "string", "description": "Team description" }
+      "name": {
+        "type": "string",
+        "description": "Name of the team."
+      },
+      "userIds": {
+        "type": "array",
+        "description": "User IDs that are members of the team.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "leaderIds": {
+        "type": "array",
+        "description": "Complete list of team leader user IDs.",
+        "items": {
+          "type": "integer"
+        }
+      }
     },
-    "required": ["name"]
+    "required": [
+      "name",
+      "userIds"
+    ]
   }
 },
 {
@@ -2102,15 +4834,40 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateTeam",
-  "description": "Update a team",
+  "description": "Update a team by ID. If userIds or leaderIds is sent, send the COMPLETE list; it replaces the existing one.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Team ID" },
-      "name": { "type": "string", "description": "Name" },
-      "description": { "type": "string", "description": "Description" }
+      "id": {
+        "type": "integer",
+        "description": "Team ID."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name of the team."
+      },
+      "description": {
+        "type": "string",
+        "description": "Team description (not in FUB docs; may be ignored)."
+      },
+      "userIds": {
+        "type": "array",
+        "description": "Complete list of member user IDs.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "leaderIds": {
+        "type": "array",
+        "description": "Complete list of team leader user IDs.",
+        "items": {
+          "type": "integer"
+        }
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -2128,13 +4885,22 @@ export const TOOL_DEFINITIONS = [
 // ==================== TEAM INBOXES ====================
 {
   "name": "listTeamInboxes",
-  "description": "List all team inboxes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List team inboxes with their users. Returns up to 100 per call; if _metadata.next is set, call again with next.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      }
     },
     "required": []
   }
@@ -2143,26 +4909,53 @@ export const TOOL_DEFINITIONS = [
 // ==================== PONDS ====================
 {
   "name": "listPonds",
-  "description": "List all ponds. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List ponds (shared lead pools). Returns up to 100 per call; if _metadata.next is set, call again with next.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      }
     },
     "required": []
   }
 },
 {
   "name": "createPond",
-  "description": "Create a pond",
+  "description": "Create a pond. name, userId (the pond lead agent) and userIds (all member user IDs) are all required.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "name": { "type": "string", "description": "Pond name" }
+      "name": {
+        "type": "string",
+        "description": "Name of the pond."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "User ID of the pond lead agent."
+      },
+      "userIds": {
+        "type": "array",
+        "description": "User IDs of all pond members.",
+        "items": {
+          "type": "integer"
+        }
+      }
     },
-    "required": ["name"]
+    "required": [
+      "name",
+      "userId",
+      "userIds"
+    ]
   }
 },
 {
@@ -2178,14 +4971,29 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updatePond",
-  "description": "Update a pond",
+  "description": "Update a pond by ID. If userIds is sent, send the COMPLETE member list; it replaces the existing one.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Pond ID" },
-      "name": { "type": "string", "description": "Name" }
+      "id": {
+        "type": "integer",
+        "description": "Pond ID."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name of the pond."
+      },
+      "userIds": {
+        "type": "array",
+        "description": "Complete list of member user IDs.",
+        "items": {
+          "type": "integer"
+        }
+      }
     },
-    "required": ["id", "name"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
@@ -2203,13 +5011,22 @@ export const TOOL_DEFINITIONS = [
 // ==================== TIMEFRAMES ====================
 {
   "name": "listTimeframes",
-  "description": "List all timeframes. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List timeframes (lead time-to-buy options). Returns up to 100 per call; if _metadata.next is set, call again with next.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      }
     },
     "required": []
   }
@@ -2218,174 +5035,571 @@ export const TOOL_DEFINITIONS = [
 // ==================== INBOX APPS ====================
 {
   "name": "inboxAppAddMessage",
-  "description": "Add a message to an inbox app conversation",
+  "description": "Add a message to an inbox app conversation (creates the conversation on first use). Conversations are keyed by YOUR externalConversationId. person and owner are needed on the first message of a conversation.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" },
-      "message": { "type": "string", "description": "Message content" },
-      "sender": { "type": "object", "description": "Sender info" },
-      "timestamp": { "type": "string", "description": "ISO timestamp" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "externalConversationId": {
+        "type": "string",
+        "description": "Your unique ID for the conversation."
+      },
+      "externalMessageId": {
+        "type": "string",
+        "description": "Your unique ID for the message."
+      },
+      "replyToExternalMessageId": {
+        "type": "string",
+        "description": "External ID of the message being replied to."
+      },
+      "sentAt": {
+        "type": "string",
+        "description": "Delivery time, ISO 8601 UTC. Defaults to now."
+      },
+      "subject": {
+        "type": "string",
+        "description": "Sets or updates the conversation subject."
+      },
+      "message": {
+        "type": "string",
+        "description": "Plain-text message body."
+      },
+      "isIncoming": {
+        "type": "boolean",
+        "description": "True if the message came in to your system."
+      },
+      "isAutomation": {
+        "type": "boolean",
+        "description": "True if the sender is an automated system. Default false."
+      },
+      "person": {
+        "type": "object",
+        "description": "Person on the conversation. Needed on the first message.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "FUB Person ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name, for people not yet in FUB."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email, for people not yet in FUB."
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone, for people not yet in FUB."
+          }
+        }
+      },
+      "owner": {
+        "type": "object",
+        "description": "Conversation owner. Needed on the first message. Set userId OR inboxId, not both.",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "FUB User who owns the conversation."
+          },
+          "inboxId": {
+            "type": "string",
+            "description": "FUB Team Inbox that owns the conversation."
+          }
+        }
+      },
+      "sender": {
+        "type": "object",
+        "description": "Message sender. Set one of userId, personId, relationshipId, participantId, or name/email/phone.",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "FUB User ID."
+          },
+          "personId": {
+            "type": "integer",
+            "description": "FUB Person ID."
+          },
+          "relationshipId": {
+            "type": "integer",
+            "description": "FUB Relationship ID."
+          },
+          "participantId": {
+            "type": "integer",
+            "description": "Conversation participant ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Sender name if no ID is known."
+          },
+          "email": {
+            "type": "string",
+            "description": "Sender email if no ID is known."
+          },
+          "phone": {
+            "type": "string",
+            "description": "Sender phone if no ID is known."
+          }
+        }
+      },
+      "deliveryStatus": {
+        "type": "string",
+        "description": "Delivery status.",
+        "enum": [
+          "Sent",
+          "Delivered",
+          "Read",
+          "Not Delivered"
+        ]
+      },
+      "deliveryStatusErrorMessage": {
+        "type": "string",
+        "description": "User-facing error text for Not Delivered."
+      },
+      "attachments": {
+        "type": "array",
+        "description": "Attachments; each url must stay valid at least 20 minutes.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "filename": {
+              "type": "string",
+              "description": "File name, e.g. house.jpg."
+            },
+            "url": {
+              "type": "string",
+              "description": "Attachment URL."
+            }
+          }
+        }
+      },
+      "richObjects": {
+        "type": "array",
+        "description": "Rich Object URLs.",
+        "items": {
+          "type": "string"
+        }
+      }
     },
-    "required": ["conversationId", "message"]
+    "required": [
+      "inboxAppId",
+      "externalConversationId",
+      "externalMessageId",
+      "message",
+      "isIncoming",
+      "sender"
+    ]
   }
 },
 {
   "name": "inboxAppUpdateMessage",
-  "description": "Update an inbox app message",
+  "description": "Update the delivery status of an inbox app message. Identify the message by id or externalMessageId. Message text cannot be changed here.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "messageId": { "type": "string", "description": "Message ID" },
-      "message": { "type": "string", "description": "Updated message" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "id": {
+        "type": "integer",
+        "description": "FUB ID of the inbox app message."
+      },
+      "externalMessageId": {
+        "type": "string",
+        "description": "Your ID for the message; alone it identifies the message."
+      },
+      "deliveryStatus": {
+        "type": "string",
+        "description": "Delivery status.",
+        "enum": [
+          "Sent",
+          "Delivered",
+          "Read",
+          "Not Delivered"
+        ]
+      },
+      "deliveryStatusErrorMessage": {
+        "type": "string",
+        "description": "User-facing error text for Not Delivered."
+      }
     },
-    "required": ["messageId", "message"]
+    "required": [
+      "inboxAppId"
+    ]
   }
 },
 {
   "name": "inboxAppAddNote",
-  "description": "Add a note to an inbox app conversation",
+  "description": "Add an internal note to an inbox app conversation, keyed by your externalConversationId.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" },
-      "note": { "type": "string", "description": "Note content" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "externalConversationId": {
+        "type": "string",
+        "description": "Your ID of the conversation to add the note to."
+      },
+      "body": {
+        "type": "string",
+        "description": "Plain-text body of the note."
+      },
+      "user": {
+        "type": "object",
+        "description": "User adding the note. Set id OR name/email.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID adding the note."
+          },
+          "name": {
+            "type": "string",
+            "description": "User name if no ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "User email if no ID."
+          }
+        }
+      }
     },
-    "required": ["conversationId", "note"]
+    "required": [
+      "inboxAppId",
+      "externalConversationId",
+      "body",
+      "user"
+    ]
   }
 },
 {
   "name": "inboxAppUpdateConversation",
-  "description": "Update an inbox app conversation status",
+  "description": "Update an inbox app conversation: subject, archive state, person, or assignment. Send only fields to change.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" },
-      "status": { "type": "string", "description": "New status" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "extConversationId": {
+        "type": "string",
+        "description": "Your external ID of the conversation to update."
+      },
+      "subject": {
+        "type": "string",
+        "description": "Sets or updates the conversation subject."
+      },
+      "archived": {
+        "type": "boolean",
+        "description": "Archive or unarchive the conversation."
+      },
+      "permanentlyArchived": {
+        "type": "boolean",
+        "description": "Disables replies/notes; users cannot un-archive."
+      },
+      "person": {
+        "type": "object",
+        "description": "Updates the person; only allowed if no Person ID is set yet.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "FUB Person ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name, for people not yet in FUB."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email, for people not yet in FUB."
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone, for people not yet in FUB."
+          }
+        }
+      },
+      "assignedUserId": {
+        "type": "integer",
+        "description": "User to reassign to. 0 reverts to the conversation owner."
+      },
+      "assignedInboxId": {
+        "type": "integer",
+        "description": "Team Inbox to reassign to. 0 reverts to the conversation owner."
+      }
     },
-    "required": ["conversationId"]
+    "required": [
+      "inboxAppId",
+      "extConversationId"
+    ]
   }
 },
 {
   "name": "inboxAppGetParticipants",
-  "description": "Get participants of an inbox app conversation",
+  "description": "List participants of an inbox app conversation.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "extConversationId": {
+        "type": "string",
+        "description": "Your external ID of the conversation."
+      }
     },
-    "required": ["conversationId"]
+    "required": [
+      "inboxAppId",
+      "extConversationId"
+    ]
   }
 },
 {
   "name": "inboxAppCreateParticipant",
-  "description": "Add a participant to an inbox app conversation",
+  "description": "Add a participant to an inbox app conversation. Give exactly one of personId, userId, relationshipId, or name/email/phone.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "conversationId": { "type": "string", "description": "Conversation ID" },
-      "personId": { "type": "number", "description": "Person ID to add" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "extConversationId": {
+        "type": "string",
+        "description": "Your external ID of the conversation."
+      },
+      "personId": {
+        "type": "integer",
+        "description": "FUB Person ID. Mutually exclusive with the other ID fields."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "FUB User ID. Mutually exclusive with the other ID fields."
+      },
+      "relationshipId": {
+        "type": "integer",
+        "description": "FUB Relationship ID. Mutually exclusive with the other ID fields."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name, if no ID is known."
+      },
+      "email": {
+        "type": "string",
+        "description": "Email, if no ID is known."
+      },
+      "phone": {
+        "type": "string",
+        "description": "Phone, if no ID is known."
+      },
+      "isAutomation": {
+        "type": "boolean",
+        "description": "True if the participant is an automated system. Default false."
+      }
     },
-    "required": ["conversationId", "personId"]
+    "required": [
+      "inboxAppId",
+      "extConversationId"
+    ]
   }
 },
 {
   "name": "inboxAppDeleteParticipant",
-  "description": "Remove a participant from an inbox app conversation by participant id",
+  "description": "Remove a participant from an inbox app conversation.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Participant ID" }
+      "inboxAppId": {
+        "type": "string",
+        "description": "ID of the inbox app making the call."
+      },
+      "extConversationId": {
+        "type": "string",
+        "description": "Your external ID of the conversation."
+      },
+      "participantId": {
+        "type": "string",
+        "description": "ID of the participant to remove."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "inboxAppId",
+      "extConversationId",
+      "participantId"
+    ]
   }
 },
 {
   "name": "inboxAppInstall",
-  "description": "Install an inbox app for a user. Requires the publishedInboxAppId from FUB's app catalog plus a webhook subscriptionUrl.",
+  "description": "Install an inbox app for a user or account-wide. Needs the publishedInboxAppId from FUB's app catalog and a webhook subscriptionUrl for replies.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "publishedInboxAppId": { "type": "number", "description": "Published inbox app ID from FUB catalog" },
-      "userId": { "type": "number", "description": "User to install for" },
-      "subscriptionUrl": { "type": "string", "description": "Webhook subscription URL" }
+      "publishedInboxAppId": {
+        "type": "integer",
+        "description": "Your Published Inbox App ID."
+      },
+      "userId": {
+        "type": "integer",
+        "description": "User ID to scope the app to, or 0 for account-wide."
+      },
+      "subscriptionUrl": {
+        "type": "string",
+        "description": "Webhook URL that receives inbox app replies."
+      }
     },
-    "required": ["publishedInboxAppId", "userId", "subscriptionUrl"]
+    "required": [
+      "publishedInboxAppId",
+      "userId",
+      "subscriptionUrl"
+    ]
   }
 },
 {
   "name": "inboxAppDeactivate",
-  "description": "Deactivate an inbox app installation by ID",
+  "description": "Deactivate an inbox app installation by ID. Destructive.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Installation ID" }
+      "id": {
+        "type": "integer",
+        "description": "Inbox app ID to deactivate (DELETE /inboxApps/{id})."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "listInboxAppInstallations",
-  "description": "List inbox app installations. Requires a registered third-party system (FUB_SYSTEM + FUB_SYSTEM_KEY). On unregistered accounts FUB returns 404 'Requested resource was not found'. Returns up to 100 per call. If _metadata.next is set, call again with next to get the rest.",
+  "description": "List installations of one published inbox app. Needs a registered third-party system (FUB_SYSTEM and FUB_SYSTEM_KEY).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Max results per call (default 100, max 100)" },
-      "offset": { "type": "number", "description": "Number of rows to skip" },
-      "next": { "type": "string", "description": "Cursor from _metadata.next of the previous call. Pass it to get the next page." }
+      "limit": {
+        "type": "integer",
+        "description": "Results per call, max 100. Server sends 100 when omitted (FUB's own default is 10)."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip before returning results."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next of the previous call for the next page."
+      },
+      "publishedInboxAppId": {
+        "type": "string",
+        "description": "Published Inbox App ID whose installations to list."
+      }
     },
-    "required": []
+    "required": [
+      "publishedInboxAppId"
+    ]
   }
 },
 
 // ==================== REACTIONS ====================
 {
   "name": "getReactions",
-  "description": "Get reactions for an item",
+  "description": "Get ONE reaction by the reaction's own ID. To list a note's reactions, fetch the note with includeReactions=true instead.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Item ID" }
+      "id": {
+        "type": "integer",
+        "description": "Reaction ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 },
 {
   "name": "createReaction",
-  "description": "Create a reaction on an item",
+  "description": "Add an emoji reaction to a Note, Call or ThreadedReply as the API key owner. Beta endpoint.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "refType": { "type": "string", "description": "Reference type (e.g. note, email)" },
-      "refId": { "type": "number", "description": "Reference ID" },
-      "emoji": { "type": "string", "description": "Emoji reaction" }
+      "refType": {
+        "type": "string",
+        "description": "Type of item reacted to.",
+        "enum": [
+          "Note",
+          "Call",
+          "ThreadedReply"
+        ]
+      },
+      "refId": {
+        "type": "integer",
+        "description": "ID of the item being reacted to."
+      },
+      "body": {
+        "type": "string",
+        "description": "Single-character emoji, e.g. a thumbs up."
+      }
     },
-    "required": ["refType", "refId", "emoji"]
+    "required": [
+      "refType",
+      "refId"
+    ]
   }
 },
 {
   "name": "deleteReaction",
-  "description": "Delete a reaction from an item",
+  "description": "Delete the API key owner's reaction from a Note, Call or ThreadedReply. Pass emoji to remove a specific one.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "refType": { "type": "string", "description": "Reference type" },
-      "refId": { "type": "number", "description": "Reference ID" }
+      "refType": {
+        "type": "string",
+        "description": "Type of item reacted to.",
+        "enum": [
+          "Note",
+          "Call",
+          "ThreadedReply"
+        ]
+      },
+      "refId": {
+        "type": "string",
+        "description": "ID of the item the reaction is on."
+      },
+      "emoji": {
+        "type": "string",
+        "description": "Single-character emoji reaction to delete."
+      }
     },
-    "required": ["refType", "refId"]
+    "required": [
+      "refType",
+      "refId"
+    ]
   }
 },
 
 // ==================== THREADED REPLIES ====================
 {
   "name": "getThreadedReplies",
-  "description": "Get threaded replies for an item",
+  "description": "Get ONE threaded reply by the reply's own ID. To list a note's replies, fetch the note with includeThreadedReplies=true instead.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Item ID" }
+      "id": {
+        "type": "integer",
+        "description": "Reply ID."
+      }
     },
-    "required": ["id"]
+    "required": [
+      "id"
+    ]
   }
 }
 
@@ -2394,60 +5608,115 @@ export const TOOL_DEFINITIONS = [
 // ==================== CONVENIENCE TOOLS ====================
 {
   "name": "removeTagFromPerson",
-  "description": "Remove a single tag from a person without affecting their other tags. Handles the read-modify-write cycle internally.",
+  "description": "Remove one tag from a person, leaving other tags untouched (case-insensitive). Use this instead of updatePerson tags, which replaces ALL tags.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Person ID" },
-      "tag": { "type": "string", "description": "Tag to remove (case-insensitive match)" }
+      "id": {
+        "type": "integer",
+        "description": "Person ID."
+      },
+      "tag": {
+        "type": "string",
+        "description": "Tag to remove (case-insensitive)."
+      }
     },
-    "required": ["id", "tag"]
+    "required": [
+      "id",
+      "tag"
+    ]
   }
 },
 {
   "name": "getPersonByEmail",
-  "description": "Look up a person by email address. Returns the contact when the match is unique, or an ambiguity result with candidate IDs when multiple contacts match.",
+  "description": "Look up one person by email. Returns the contact, or an ambiguity result with candidate IDs. Use this to find a contact; use listPeople for other filters.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "email": { "type": "string", "description": "Email address to look up" }
+      "email": {
+        "type": "string",
+        "description": "Email address to look up."
+      }
     },
-    "required": ["email"]
+    "required": [
+      "email"
+    ]
   }
 },
 {
   "name": "searchPeopleByTag",
-  "description": "Find all people with one or more tags. Comma-separate multiple tags for OR matching (e.g. 'Investor,Buyer' returns people with either tag).",
+  "description": "Find people with a tag (GET /people?tags=). Use this for a simple tag lookup; use listPeople when combining tags with other filters. OR-matching of multiple tags is unverified.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "tags": { "type": "string", "description": "Comma-separated tag(s) to search for" },
-      "limit": { "type": "number", "description": "Max results (default 25, max 100)" },
-      "offset": { "type": "number", "description": "Offset for pagination" }
+      "tags": {
+        "type": "string",
+        "description": "Comma-separated tags, e.g. 'Investor,Buyer'."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Max results, up to 100. Server sets no default; FUB default is 10."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip."
+      },
+      "next": {
+        "type": "string",
+        "description": "Cursor from _metadata.next."
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort field; prefix with - for descending."
+      },
+      "fields": {
+        "type": "string",
+        "description": "Comma-separated fields to return."
+      }
     },
-    "required": ["tags"]
+    "required": [
+      "tags"
+    ]
   }
 },
 {
   "name": "bulkUpdatePeople",
-  "description": "Update multiple people with the same changes. Rate-limited to stay within FUB's 25 PUTs per 10 seconds. Returns results for each person.",
+  "description": "Apply the same updatePerson changes to many people, throttled (pauses 11s per 20 people). Use this instead of looping updatePerson. Returns per-person success.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "ids": { "type": "array", "items": { "type": "number" }, "description": "Array of person IDs to update" },
-      "mergeTags": { "type": "boolean", "description": "Merge tags instead of replacing" },
-      "updates": { "type": "object", "description": "Fields to update on each person (same fields as updatePerson: tags, stage, assignedTo, custom* fields, etc.)" }
+      "ids": {
+        "type": "array",
+        "description": "Person IDs to update.",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "mergeTags": {
+        "type": "boolean",
+        "description": "Merge tags instead of replacing them."
+      },
+      "updates": {
+        "type": "object",
+        "description": "Fields to set on each person, same as updatePerson (tags, stage, assignedUserId, custom fields)."
+      }
     },
-    "required": ["ids", "updates"]
+    "required": [
+      "ids",
+      "updates"
+    ]
   }
 },
 {
   "name": "listAvailableTags",
-  "description": "Discover tags used in your FUB account by scanning recent contacts. Returns unique tags sorted alphabetically. Note: scans up to 500 contacts so may not find rarely-used tags.",
+  "description": "List distinct tags by scanning recent contacts (up to 500, 100 per page). Rarely used tags may be missed. Use searchPeopleByTag to find people with a known tag.",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "limit": { "type": "number", "description": "Number of contacts to scan (default 500, max 500)" }
+      "limit": {
+        "type": "integer",
+        "description": "Contacts to scan, max 500. Default 500."
+      }
     },
     "required": []
   }
@@ -2940,8 +6209,9 @@ export async function handleToolCall(name, rawArgs) {
       return { appointments: response.data.appointments, _metadata: response.data._metadata };
     }
     case 'createAppointment': {
-      const body = translateAppointmentArgs(args);
-      const response = await fubApi.post('/appointments', body);
+      const { sendInvitation, ...apptArgs } = args;
+      const body = translateAppointmentArgs(apptArgs);
+      const response = await fubApi.post('/appointments', body, sendInvitation === undefined ? undefined : { params: { sendInvitation } });
       return response.data;
     }
     case 'getAppointment': {
@@ -3017,6 +6287,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'getWebhook': {
+      requireWebhookCreds();
       const response = await fubApi.get(`/webhooks/${args.id}`);
       return response.data;
     }
@@ -3032,6 +6303,7 @@ export async function handleToolCall(name, rawArgs) {
       return { success: true, message: `Webhook ${args.id} deleted` };
     }
     case 'getWebhookEvents': {
+      requireWebhookCreds();
       const response = await fubApi.get(`/webhookEvents/${args.id}`);
       return response.data;
     }
@@ -3394,7 +6666,18 @@ export async function handleToolCall(name, rawArgs) {
 // Single source of truth for "is this a destructive delete tool?" — used both to
 // filter the advertised tool surface and to enforce Safe Mode at dispatch time.
 // Server instructions: sent once at connect. Tells the AI the one-call answer to common questions.
-export const DEFAULT_INSTRUCTIONS = `__INSTRUCTIONS__`;
+export const DEFAULT_INSTRUCTIONS = `Follow Up Boss CRM tools. Answer common questions in ONE call:
+- New leads: listPeople stage="Lead" (newest created first by default). For "today" or "this week", read each person's created date and stop at the first one older than the start date.
+- Find a contact: getPersonByEmail for an email; listPeople name="First Last" or phone= otherwise.
+- Tasks: listTasks isCompleted=false with due="today" or due="overdue"; add assignedUserId for one agent, personId for one contact. Get your own user ID from getCurrentUser.
+- Appointments: listAppointments start=<ISO> end=<ISO>; add userId or personId to narrow.
+- Deals: listDeals with pipelineId, stageId, userId or personId. Stage and pipeline IDs come from listStages and listPipelines.
+- Notes: createNote personId + body. Tasks: createTask personId + name + dueDate (YYYY-MM-DD) + assignedUserId.
+Rules:
+- Stage filters on listPeople take the stage NAME; listStages gives this account's names.
+- updatePerson tags REPLACES all tags unless mergeTags=true. To remove one tag use removeTagFromPerson.
+- Lists return 10 rows unless limit is set (max 100). If _metadata.next is set, call again with next=<value>.
+- Pass fields=id,name,stage,created,... to keep responses small.`;
 
 export function isDeleteTool(name) {
   const n = String(name).toLowerCase();
