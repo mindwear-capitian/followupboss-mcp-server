@@ -21,8 +21,8 @@ process.env.FUB_API_KEY = 'fka_test';
 delete process.env.FUB_SAFE_MODE;
 
 let requestCount = 0;
-axios.create = () => new Proxy({}, {
-  get: () => async () => {
+axios.create = () => new Proxy({ interceptors: { request: { use() {} }, response: { use() {} } } }, {
+  get: (t, p) => p in t ? t[p] : async () => {
     requestCount++;
     throw new Error('Safe Mode test attempted an HTTP request');
   }

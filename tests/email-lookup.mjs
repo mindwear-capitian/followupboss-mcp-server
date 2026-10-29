@@ -11,6 +11,7 @@ process.env.FUB_API_KEY = 'fka_test';
 let responseData;
 const requests = [];
 axios.create = () => ({
+  interceptors: { request: { use() {} }, response: { use() {} } },
   async get(path, options) {
     requests.push({ path, options });
     return { data: responseData };

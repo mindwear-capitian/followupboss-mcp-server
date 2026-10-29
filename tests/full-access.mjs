@@ -10,8 +10,8 @@ process.env.FUB_API_KEY = 'fka_test';
 process.env.FUB_SAFE_MODE = 'false';
 
 const requests = [];
-axios.create = () => new Proxy({}, {
-  get: (_target, method) => async (...args) => {
+axios.create = () => new Proxy({ interceptors: { request: { use() {} }, response: { use() {} } } }, {
+  get: (_target, method) => method in _target ? _target[method] : async (...args) => {
     requests.push({ method, args });
     return { data: {} };
   }

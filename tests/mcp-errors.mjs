@@ -24,6 +24,7 @@ function apiError(status, message, details = {}) {
 }
 
 axios.create = () => ({
+  interceptors: { request: { use() {} }, response: { use() {} } },
   async get() {
     callCount++;
     if (scenario === 'success') return { data: { id: 7, name: 'Test Account' } };
