@@ -6779,8 +6779,9 @@ export function createServer(opts = {}) {
 
   // Active built-in tools (filtered for SAFE MODE) + any caller-supplied extras.
   // Extras are NOT auto-filtered by SAFE MODE -- caller decides per-tool.
-  const extendedTools = [...activeTools, ...extraTools.map(decorateTool)];
+  // Extras replace a built-in tool with the same name (calls already route to the extra handler).
   const extraToolNames = new Set(extraTools.map(t => t.name));
+  const extendedTools = [...activeTools.filter(t => !extraToolNames.has(t.name)), ...extraTools.map(decorateTool)];
 
   server.setRequestHandler('tools/list', async () => ({
     tools: extendedTools
