@@ -1889,7 +1889,7 @@ export const TOOL_DEFINITIONS = [
 // ==================== TEXT MESSAGES ====================
 {
   "name": "listTextMessages",
-  "description": "List text messages for a person or phone number. Filter by personId, toNumber, or fromNumber.",
+  "description": "List text messages. FUB requires at least one filter: personId, phone, toNumber, fromNumber, threadId, sharedInboxId, groupTextId, participants or id.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -3038,13 +3038,14 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "deleteStage",
-  "description": "Delete a stage",
+  "description": "Delete a lead stage. FUB requires assignStageId: the stage that people in the deleted stage move to (listStages gives IDs).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Stage ID" }
+      "id": { "type": "number", "description": "Stage ID" },
+      "assignStageId": { "type": "number", "description": "Stage that people in the deleted stage move to. Required by FUB." }
     },
-    "required": ["id"]
+    "required": ["id", "assignStageId"]
   }
 },
 
@@ -3514,13 +3515,14 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "deleteAppointmentType",
-  "description": "Delete an appointment type",
+  "description": "Delete an appointment type. FUB requires assignTypeId: the type that appointments of the deleted type move to (listAppointmentTypes gives IDs).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Type ID" }
+      "id": { "type": "number", "description": "Type ID" },
+      "assignTypeId": { "type": "number", "description": "Appointment type that existing appointments move to. Required by FUB." }
     },
-    "required": ["id"]
+    "required": ["id", "assignTypeId"]
   }
 },
 
@@ -3614,13 +3616,14 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "deleteAppointmentOutcome",
-  "description": "Delete an appointment outcome",
+  "description": "Delete an appointment outcome. FUB requires assignOutcomeId: the outcome that appointments with the deleted outcome move to (listAppointmentOutcomes gives IDs).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Outcome ID" }
+      "id": { "type": "number", "description": "Outcome ID" },
+      "assignOutcomeId": { "type": "number", "description": "Appointment outcome that existing appointments move to. Required by FUB." }
     },
-    "required": ["id"]
+    "required": ["id", "assignOutcomeId"]
   }
 },
 
@@ -4698,7 +4701,7 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateGroup",
-  "description": "Update a group by ID. Admin accounts only. Send only fields to change.",
+  "description": "Update a group by ID. Admin accounts only. Send only fields to change; the current users are kept when users is not sent.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -4998,13 +5001,14 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "deletePond",
-  "description": "Delete a pond",
+  "description": "Delete a pond. FUB requires assignTo: the user ID that gets the people in the deleted pond (listUsers gives IDs).",
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "number", "description": "Pond ID" }
+      "id": { "type": "number", "description": "Pond ID" },
+      "assignTo": { "type": "number", "description": "User ID that gets the people in the deleted pond. Required by FUB." }
     },
-    "required": ["id"]
+    "required": ["id", "assignTo"]
   }
 },
 
@@ -6072,6 +6076,12 @@ export async function handleToolCall(name, rawArgs) {
     }
     case 'updateTemplate': {
       const { id, ...body } = args;
+      // FUB rejects the update unless subject and body are both present: keep the current ones.
+      if (body.subject === undefined || body.body === undefined) {
+        const cur = (await fubApi.get(`/templates/${id}`)).data || {};
+        if (body.subject === undefined) body.subject = cur.subject;
+        if (body.body === undefined) body.body = cur.body;
+      }
       const response = await fubApi.put(`/templates/${id}`, body);
       return response.data;
     }
@@ -6099,6 +6109,11 @@ export async function handleToolCall(name, rawArgs) {
     }
     case 'updateTextMessageTemplate': {
       const { id, ...body } = args;
+      // FUB rejects the update unless message is present: keep the current one.
+      if (body.message === undefined) {
+        const cur = (await fubApi.get(`/textMessageTemplates/${id}`)).data || {};
+        body.message = cur.message;
+      }
       const response = await fubApi.put(`/textMessageTemplates/${id}`, body);
       return response.data;
     }
@@ -6176,7 +6191,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'deleteStage': {
-      await fubApi.delete(`/stages/${args.id}`);
+      await fubApi.delete(`/stages/${args.id}`, { params: { assignStageId: args.assignStageId } });
       return { success: true, message: `Stage ${args.id} deleted` };
     }
 
@@ -6248,7 +6263,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'deleteAppointmentType': {
-      await fubApi.delete(`/appointmentTypes/${args.id}`);
+      await fubApi.delete(`/appointmentTypes/${args.id}`, { params: { assignTypeId: args.assignTypeId } });
       return { success: true, message: `Appointment type ${args.id} deleted` };
     }
 
@@ -6271,7 +6286,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'deleteAppointmentOutcome': {
-      await fubApi.delete(`/appointmentOutcomes/${args.id}`);
+      await fubApi.delete(`/appointmentOutcomes/${args.id}`, { params: { assignOutcomeId: args.assignOutcomeId } });
       return { success: true, message: `Appointment outcome ${args.id} deleted` };
     }
 
@@ -6314,7 +6329,11 @@ export async function handleToolCall(name, rawArgs) {
       return { pipelines: response.data.pipelines, _metadata: response.data._metadata };
     }
     case 'createPipeline': {
-      const response = await fubApi.post('/pipelines', args);
+      // FUB answers 500, and still makes the pipeline without stages, when a stage has no closedStage.
+      const body = Array.isArray(args.stages)
+        ? { ...args, stages: args.stages.map(st => (st && typeof st === 'object' && st.closedStage === undefined ? { ...st, closedStage: false } : st)) }
+        : args;
+      const response = await fubApi.post('/pipelines', body);
       return response.data;
     }
     case 'getPipeline': {
@@ -6423,6 +6442,11 @@ export async function handleToolCall(name, rawArgs) {
     case 'updateGroup': {
       const { id, userIds, ...rest } = args;
       const body = rest.users === undefined && userIds !== undefined ? { ...rest, users: userIds } : rest;
+      // FUB rejects the update unless users is present: keep the current members.
+      if (body.users === undefined) {
+        const cur = (await fubApi.get(`/groups/${id}`)).data || {};
+        body.users = (cur.users || []).map(u => (u && typeof u === 'object' ? u.id : u)).filter(v => v !== undefined);
+      }
       const response = await fubApi.put(`/groups/${id}`, body);
       return response.data;
     }
@@ -6479,7 +6503,7 @@ export async function handleToolCall(name, rawArgs) {
       return response.data;
     }
     case 'deletePond': {
-      await fubApi.delete(`/ponds/${args.id}`);
+      await fubApi.delete(`/ponds/${args.id}`, { params: { assignTo: args.assignTo } });
       return { success: true, message: `Pond ${args.id} deleted` };
     }
 
