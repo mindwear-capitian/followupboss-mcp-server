@@ -6,7 +6,8 @@
 // a record FUB cannot delete are SKIPPED with the reason.
 //
 // Required env: FUB_API_KEY, TEST_PERSON_ID. Optional: FUB_SYSTEM + FUB_SYSTEM_KEY
-// (restricted endpoints: webhooks, attachments, text logs), TEST_USER_ID (default 1).
+// (restricted endpoints: webhooks, attachments, text logs), TEST_USER_ID (default 1),
+// WEBHOOK_TEST_URL (a URL you own; the test webhook only listens for peopleDeleted).
 // Run with FUB_SAFE_MODE=false so delete tools are available for cleanup.
 
 if (!process.env.FUB_API_KEY || !process.env.TEST_PERSON_ID) {
@@ -19,6 +20,7 @@ const { TOOL_DEFINITIONS, handleToolCall } = await import('../index.js');
 const PID = Number(process.env.TEST_PERSON_ID);
 const UID = Number(process.env.TEST_USER_ID || 1);
 const HAS_SYSTEM = !!(process.env.FUB_SYSTEM && process.env.FUB_SYSTEM_KEY);
+const WEBHOOK_TEST_URL = process.env.WEBHOOK_TEST_URL || 'https://example.com/zz-mcp-webhook-test';
 const STAMP = `ZZ MCP Test ${Date.now()}`;
 const results = new Map();
 const cleanup = [];
@@ -221,10 +223,10 @@ if (pipe) {
 
 // webhook (rare event, URL on our own domain)
 if (HAS_SYSTEM) {
-  const wh = await call('createWebhook', { event: 'peopleDeleted', url: 'https://staystra.com/zz-mcp-webhook-test' });
+  const wh = await call('createWebhook', { event: 'peopleDeleted', url: '${WEBHOOK_TEST_URL}' });
   if (wh) {
     await call('getWebhook', { id: wh.id });
-    await call('updateWebhook', { id: wh.id, url: 'https://staystra.com/zz-mcp-webhook-test-2' });
+    await call('updateWebhook', { id: wh.id, url: '${WEBHOOK_TEST_URL}-2' });
     await call('getWebhookEvents', { id: wh.id }, { expectError: true });
     cleanup.push(['deleteWebhook', wh.id]);
   }
