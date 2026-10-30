@@ -195,6 +195,21 @@ function translateRelationshipArgs(args) {
   return out;
 }
 
+// FUB wants invitees as {userId:int} / {personId:int}.
+// The old {type:"user"|"person", id} shape is accepted by FUB (200) but silently ignored, so
+// invitees came back empty. Convert legacy shapes; pass the FUB shape through untouched.
+function normalizeInvitees(list) {
+  return list.map((inv) => {
+    if (!inv || typeof inv !== 'object') return inv;
+    if (inv.userId !== undefined || inv.personId !== undefined) return inv;
+    if (inv.id !== undefined && (inv.type === 'user' || inv.type === 'person')) {
+      const { type, id, ...rest } = inv;
+      return type === 'user' ? { userId: Number(id), ...rest } : { personId: Number(id), ...rest };
+    }
+    return inv;
+  });
+}
+
 function translateAppointmentArgs(args) {
   const {
     startTime, endTime, appointmentTypeId, appointmentOutcomeId, personId,
@@ -207,9 +222,10 @@ function translateAppointmentArgs(args) {
   if (appointmentOutcomeId !== undefined && out.outcomeId === undefined) out.outcomeId = appointmentOutcomeId;
   if (personId !== undefined) {
     const list = Array.isArray(out.invitees) ? [...out.invitees] : [];
-    list.push({ type: 'person', id: personId });
+    list.push({ personId: Number(personId) });
     out.invitees = list;
   }
+  if (Array.isArray(out.invitees)) out.invitees = normalizeInvitees(out.invitees);
   return out;
 }
 
@@ -1443,7 +1459,7 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "createAppointment",
-  "description": "Create an appointment. FUB uses start/end (not startTime/endTime), typeId/outcomeId (not appointmentTypeId/appointmentOutcomeId), and invitees:[{type:'person'|'user',id}] (personId is NOT a top-level field).",
+  "description": "Create an appointment. FUB uses start/end (not startTime/endTime), typeId/outcomeId (not appointmentTypeId/appointmentOutcomeId), and invitees (see below). Invitees: [{userId:int}] for a FUB user, [{personId:int}] for a contact (optional name/email). The shape {type,id} is NOT FUB's; it is auto-converted, but prefer userId/personId. This tool never sends invitation emails (sendInvitation is not sent; FUB's default is off), but FUB syncs appointments to Google/Outlook calendars for invitees, so a person invitee may still get a calendar invite from the calendar side.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1451,7 +1467,7 @@ export const TOOL_DEFINITIONS = [
       "start": { "type": "string", "description": "Start ISO 8601 (required)" },
       "end": { "type": "string", "description": "End ISO 8601 (required)" },
       "description": { "type": "string", "description": "Description" },
-      "invitees": { "type": "array", "description": "Array of {type:'person'|'user', id:int}", "items": { "type": "object" } },
+      "invitees": { "type": "array", "description": "Array of {userId:int} (FUB user) and/or {personId:int} (contact)", "items": { "type": "object" } },
       "allDay": { "type": "boolean" },
       "location": { "type": "string", "description": "Location" },
       "typeId": { "type": "number", "description": "Appointment type ID" },
@@ -1474,7 +1490,7 @@ export const TOOL_DEFINITIONS = [
 },
 {
   "name": "updateAppointment",
-  "description": "Update an appointment. FUB requires `start` and `end` on EVERY update (even partial edits) or it returns 'Valid Start and End dates are required'. Refetch with getAppointment first if you only have the id.",
+  "description": "Update an appointment. FUB requires `start` and `end` on EVERY update (even partial edits) or it returns 'Valid Start and End dates are required'. Refetch with getAppointment first if you only have the id. Invitees: [{userId:int}] for a FUB user, [{personId:int}] for a contact (optional name/email). The shape {type,id} is NOT FUB's; it is auto-converted, but prefer userId/personId. This tool never sends invitation emails (sendInvitation is not sent; FUB's default is off), but FUB syncs appointments to Google/Outlook calendars for invitees, so a person invitee may still get a calendar invite from the calendar side.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1483,7 +1499,7 @@ export const TOOL_DEFINITIONS = [
       "start": { "type": "string", "description": "Start ISO" },
       "end": { "type": "string", "description": "End ISO" },
       "description": { "type": "string" },
-      "invitees": { "type": "array", "items": { "type": "object" } },
+      "invitees": { "type": "array", "description": "Array of {userId:int} (FUB user) and/or {personId:int} (contact)", "items": { "type": "object" } },
       "allDay": { "type": "boolean" },
       "location": { "type": "string" },
       "typeId": { "type": "number", "description": "Type ID" },
