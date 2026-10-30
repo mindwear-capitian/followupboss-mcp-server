@@ -10,7 +10,7 @@ That said, anything that runs against a real CRM with real client data is worth 
 
 **Please do not open a public GitHub issue for security problems.**
 
-Instead, report via [neuhausre.com/contact](https://neuhausre.com/contact) with the subject line "FUB MCP Security". Include:
+Instead, report via [neuhausre.com/contact/](https://neuhausre.com/contact/) with the subject line "FUB MCP Security". Include:
 
 - A description of the issue
 - Steps to reproduce (or proof-of-concept)

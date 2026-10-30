@@ -72,7 +72,7 @@ If you've found and fixed a bug in your own fork without going through a PR, tha
 
 ## Not a contribution but still welcome
 
-- Real estate referrals from licensed agents anywhere in the US, for clients moving to or from Texas. Reach out via [neuhausre.com/contact](https://neuhausre.com/contact).
+- Real estate referrals from licensed agents anywhere in the US, for clients moving to or from Texas. Reach out via [neuhausre.com/contact/](https://neuhausre.com/contact/).
 - A blog post about how you use this tool, with a link back to the repo.
 - Questions in [Discussions](https://github.com/mindwear-capitian/followupboss-mcp-server/discussions) — even basic ones. They help other realtors who are trying to figure this out.
 

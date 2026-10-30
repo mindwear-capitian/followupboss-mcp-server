@@ -1,10 +1,12 @@
 # One-click install on Hostinger
 
-Talk to your Follow Up Boss CRM from Claude on the web, desktop or phone. This puts the connection on a small server that you own. Your key and your data stay on your server.
+Talk to your Follow Up Boss CRM from Claude on the web, desktop or phone. This puts the connection on a small server that you rent and control. Your FUB key stays on your server.
 
 No coding. About 15 minutes.
 
 [![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostg.xyz/aff_c?offer_id=815&aff_id=245188&url=https%3A%2F%2Fwww.hostinger.com%2Fdocker-hosting%3Fcompose_url%3Dhttps%253A%252F%252Fraw.githubusercontent.com%252Fmindwear-capitian%252Ffollowupboss-mcp-server%252Fmain%252Fdeploy%252Fhostinger%252Fdocker-compose.yml)
+
+*Affiliate link: if you buy through this button, Hostinger pays the author a commission. Your price is the same. The software is free; the server is a paid Hostinger plan.*
 
 ## Before you start
 
@@ -12,7 +14,7 @@ Have these 3 things:
 
 - Admin access to your Follow Up Boss account. (If you do not see **Admin** in the top bar of FUB, ask your account owner to do step 1 for you.)
 - A Claude account at [claude.ai](https://claude.ai).
-- A notes app or a piece of paper, to keep 2 things for a few minutes.
+- A notes app or a piece of paper, to keep 3 things for a few minutes: your FUB key, a password, and your server address.
 
 ## Step 1: Get your Follow Up Boss API key
 
@@ -24,7 +26,7 @@ Have these 3 things:
 
 ## Step 2: Make a password
 
-Make up a password of **12 or more characters**. Write it in your notes. You type it one time in step 6, so Claude can connect.
+Make up a password of **12 or more characters**. Write it in your notes. You type it in step 4 (on the server) and again in step 6 (in Claude).
 
 ## Step 3: Buy the server
 

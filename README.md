@@ -1,12 +1,14 @@
 # Follow Up Boss MCP Server — Built for Realtors
 
-> Talk to your Follow Up Boss CRM in plain English from Claude AI (or any MCP-compatible tool). 160 tools covering 100% of the official API, plus `about`/`help` meta tools. Built by a working real estate broker, not a dev shop.
+> Talk to your Follow Up Boss CRM in plain English from Claude AI (or any MCP-compatible tool). 160 tools covering the official API, including the `about` and `help` tools. Built by a working real estate broker, not a dev shop.
 
-**Built by [Ed Neuhaus](https://neuhausre.com) — broker / owner at [Neuhaus Realty Group](https://neuhausre.com) in Austin, Texas.** Licensed real estate broker since 2009, 19+ years in the business. I built this because I wanted to talk to my own FUB account in plain English. It's free for self-host use under the [Elastic License 2.0](LICENSE).
+**Built by [Ed Neuhaus](https://neuhausre.com) — broker / owner at [Neuhaus Realty Group](https://neuhausre.com) in Austin, Texas.** Licensed real estate broker since 2009. I built this because I wanted to talk to my own FUB account in plain English. It's free for self-host use under the [Elastic License 2.0](LICENSE).
 
 ### One-click install on Hostinger
 
 No terminal needed. Get your own server and connect it to Claude on the web, desktop or phone. Pick the **KVM 1** plan.
+
+*Affiliate link: if you buy through this button, Hostinger pays the author a commission. Your price is the same. The software is free; the server is a paid Hostinger plan.*
 
 [![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostg.xyz/aff_c?offer_id=815&aff_id=245188&url=https%3A%2F%2Fwww.hostinger.com%2Fdocker-hosting%3Fcompose_url%3Dhttps%253A%252F%252Fraw.githubusercontent.com%252Fmindwear-capitian%252Ffollowupboss-mcp-server%252Fmain%252Fdeploy%252Fhostinger%252Fdocker-compose.yml)
 
@@ -17,22 +19,22 @@ Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
 | Way | Needs a server? | Works in | Setup |
 |---|---|---|---|
 | **Deploy on Hostinger** (button above) | Yes, your own Hostinger VPS | Claude on the web, desktop and phone | About 15 minutes, no terminal |
-| **Claude Desktop file** | No, it runs on your computer | Claude Desktop | Download the `.mcpb` file from the [latest release](https://github.com/mindwear-capitian/followupboss-mcp-server/releases/latest) and double-click it |
-| **Install it yourself** (npm or Docker) | Your computer or any server | Any MCP tool | [Setup](#setup-5-minutes) below |
+| **Claude Desktop file** | No, it runs on your computer | Claude Desktop | Download the `.mcpb` file from the [latest release](https://github.com/mindwear-capitian/followupboss-mcp-server/releases/latest) and double-click it. Claude Desktop asks for your FUB API key. |
+| **Install it yourself** (npm or Docker) | Your computer or any server | Any MCP tool | [Install it yourself](#install-it-yourself) below (uses Terminal) |
 
 ### New in 2.0
 
 - **One-click install on Hostinger**, with HTTPS and a password login built in.
-- **Every tool checked against the Follow Up Boss API docs and a live account.** 99 tool descriptions rewritten, and the tools that FUB used to reject now work.
-- **Faster, steadier connections.** The server keeps no sessions, so a restart never drops Claude, and it speaks both the new and the old MCP protocol versions.
-- **Fewer tools when you want them.** `FUB_TOOL_GROUPS` loads only the groups you use, and every tool tells Claude whether it only reads or makes changes.
+- **Tools checked against the Follow Up Boss API docs and a live account.** 99 tool descriptions rewritten, and 132 of the 160 tools called against a real account before release. The tools that FUB used to reject now work.
+- **Steadier connections.** A server restart no longer drops Claude, and both the new and the older versions of the MCP standard work.
+- **Fewer tools when you want them.** `FUB_TOOL_GROUPS` (for example `core,setup`) loads only the groups you use: `core`, `setup`, `marketing`, `integrations`, `delete`. Every tool also tells Claude whether it only reads or makes changes.
 - **New leads first.** `listPeople` lists the newest contacts first.
 
 Full list: [CHANGELOG](CHANGELOG.md).
 
 ### Other things I'm working on
 
-- **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile, more on how this one's built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)
+- **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile. How this project is built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)
 - **[NeuhausRE.com](https://neuhausre.com)** — My brokerage's site, AI-powered home search
 - **[StaySTRA.com](https://staystra.com)** — Short-term rental investment analyzer
 - **[Austin MLS MCP](https://github.com/mindwear-capitian/austin-mls-mcp)** — hosted MLS MCP server (live MLS data via Claude, ChatGPT, Perplexity, and more)
@@ -40,13 +42,13 @@ Full list: [CHANGELOG](CHANGELOG.md).
 
 ### Want to thank me?
 
-1. **Got a real estate referral?** I take referrals from licensed agents in any state for clients moving to or from Texas. Reach out via **[neuhausre.com/contact](https://neuhausre.com/contact)**.
+1. **Got a real estate referral?** I take referrals from licensed agents in any state for clients moving to or from Texas. Reach out via **[neuhausre.com/contact/](https://neuhausre.com/contact/)**.
 2. **Write about it.** Blog post, LinkedIn, X — tag me and link to neuhausre.com.
 3. **Open an issue or PR** if you find a bug or build something useful.
 
-> **WARNING: This tool can read AND change your Follow Up Boss account.** It can create and update contacts, deals, tasks, notes, and other data in your CRM. Delete tools are off unless you turn off Safe Mode. **Strongly recommended: back up your FUB data before turning this loose, unless you really know what you're doing.** Always review AI-suggested actions before confirming changes to live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
+> **WARNING: This tool can read AND change your Follow Up Boss account.** It can create and update contacts, deals, tasks, notes, and other data in your CRM. Delete tools are off unless you turn off Safe Mode. **Back up your FUB data before you start**, and review what the AI wants to change before you confirm it. The authors are not responsible for any data loss or unintended changes to your FUB account.
 
-> ### ⚠️ READ BEFORE SETTING `FUB_SYSTEM` / `FUB_SYSTEM_KEY` — TOS RISK
+> **Read before you set `FUB_SYSTEM` / `FUB_SYSTEM_KEY` (Terms of Service risk)**
 >
 > Several FUB API endpoints are marked **"Restricted - Registered Systems Only"** and require `X-System` + `X-System-Key` headers (this MCP exposes them as `FUB_SYSTEM` + `FUB_SYSTEM_KEY` env vars). These endpoints include: **webhooks, inbox apps, automations (2.0), text-message logging, person/deal attachments.**
 >
@@ -67,7 +69,7 @@ Full list: [CHANGELOG](CHANGELOG.md).
 >
 > **Use at your own risk. The authors of this project are not responsible for any TOS violations, account suspensions, bans, or data loss arising from your use of the restricted endpoints.**
 
-> **License note:** This project moved from MIT to **[Elastic License 2.0](LICENSE)** in v1.1.2. You may use, modify, and self-host for your own business at no cost. You may **not** offer it as a hosted/managed service to third parties. For commercial hosting rights, reach out via [neuhausre.com/contact](https://neuhausre.com/contact). Versions ≤ v1.1.1 remain MIT-licensed.
+> **License note:** This project moved from MIT to **[Elastic License 2.0](LICENSE)** in v1.1.2. You may use, modify, and self-host for your own business at no cost. You may **not** offer it as a hosted/managed service to third parties. For commercial hosting rights, reach out via [neuhausre.com/contact/](https://neuhausre.com/contact/). Versions ≤ v1.1.1 remain MIT-licensed.
 
 ## What This Does
 
@@ -92,7 +94,7 @@ This server acts as a bridge between your Follow Up Boss account and AI tools li
 2. **Claude Desktop**, **Claude Code**, or any MCP-compatible AI tool
 3. **Node.js 20 or higher** -- This is a free tool that runs JavaScript. If you don't have it, download it from [nodejs.org](https://nodejs.org/) (choose the LTS version)
 
-## Setup (5 Minutes)
+## Install it yourself
 
 ### Step 1: Get Your FUB API Key
 
@@ -384,9 +386,7 @@ Then restart Claude Code.
 
 #### ChatGPT, OpenAI API, and Grok
 
-These tools only support **remote** MCP servers (hosted on the internet), not local ones. This means the setup is more advanced -- you would need to host this server on a cloud service with HTTPS.
-
-If there's enough interest, we may add a hosted version in the future. For now, we recommend using one of the tools listed above that support local MCP servers.
+These tools only support **remote** MCP servers (on the internet with HTTPS), not local ones. The [Hostinger install](deploy/hostinger/README.md) gives you exactly that: use `https://<your server>/mcp` as the server address and sign in with your password. Claude on the web and phone use the same setup.
 
 ## Usage Examples
 
@@ -480,7 +480,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | Tool | Description |
 |------|-------------|
 | `listTextMessages` | List text messages (needs one filter, e.g. personId) |
-| `createTextMessage` | Send a text message |
+| `createTextMessage` | Log a text message on a contact (FUB does not send it) |
 | `getTextMessage` | Get a text message by ID |
 
 ### Users (3 tools)
@@ -760,7 +760,7 @@ The `bulkUpdatePeople` tool also adds a built-in pause every 20 operations to st
 
 **Is my data safe?**
 
-Yes. This server runs on your computer, or on your own server if you use the Hostinger install. Your API key stays there and is sent only to Follow Up Boss's official API. No data passes through anyone else's servers, including ours.
+Your API key stays on your computer, or on your own server if you use the Hostinger install, and is sent only to Follow Up Boss's official API. Your CRM data goes between Follow Up Boss, your server, and the AI tool you use (for example Claude). None of it goes to the author.
 
 **Does this cost anything?**
 
@@ -768,7 +768,7 @@ This server is free and open source. You just need a Follow Up Boss account with
 
 **Can Claude modify my FUB data?**
 
-Yes, Claude can create and update records in your FUB account. Delete tools are off by default (Safe Mode). Every tool tells Claude whether it changes data, so Claude asks before it makes a change. If you want read-only access, you can create a restricted API key in FUB.
+Yes, Claude can create and update records in your FUB account. Delete tools are off by default (Safe Mode). Every tool tells the AI whether it changes data, so tools like Claude can ask you before a change. If you want read-only access, you can create a restricted API key in FUB.
 
 **Where are the call recording URLs?**
 

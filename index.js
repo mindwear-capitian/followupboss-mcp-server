@@ -15,7 +15,7 @@
  * Other things by Ed: NeuhausRE.com, StaySTRA.com,
  * mls.neuhausre.com (MLS MCP), Kendall Creek Properties.
  *
- * Real estate referral in any state? https://neuhausre.com/contact
+ * Real estate referral in any state? https://neuhausre.com/contact/
  */
 
 import { Server, createMcpHandler } from '@modelcontextprotocol/server';
@@ -5766,7 +5766,7 @@ export async function handleToolCall(name, rawArgs) {
           company: 'Neuhaus Realty Group, LLC',
           location: 'Austin, Texas',
           experience: '19+ years in real estate (since 2007)',
-          contact: 'https://neuhausre.com/contact',
+          contact: 'https://neuhausre.com/contact/',
           website: 'https://neuhausre.com',
           linkedin: 'https://linkedin.com/in/edneuhaus'
         },
@@ -5778,7 +5778,7 @@ export async function handleToolCall(name, rawArgs) {
           'Kendall Creek Properties': 'Sister brokerage'
         },
         how_to_thank_me: [
-          'Got a real estate client moving to or from Austin? Refer them. Texas real estate referrals welcome from licensed agents in any state. Reach out via https://neuhausre.com/contact.',
+          'Got a real estate client moving to or from Austin? Refer them. Texas real estate referrals welcome from licensed agents in any state. Reach out via https://neuhausre.com/contact/.',
           'Write about this tool on your blog, LinkedIn, or X. Tag @edneuhaus and link to neuhausre.com.',
           'Open an issue or PR on GitHub if you find a bug or build something useful.'
         ],
@@ -5812,7 +5812,7 @@ export async function handleToolCall(name, rawArgs) {
         safe_mode: 'FUB_SAFE_MODE=true (default) disables all 24 DELETE-backed tools. Create, update, and bulk-update tools remain enabled. Set to false only if you really need delete operations.',
         bug_reports: 'https://github.com/mindwear-capitian/followupboss-mcp-server/issues',
         feature_requests: 'PRs welcome. Or open an issue.',
-        author: 'Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX. Contact: https://neuhausre.com/contact. Real estate referrals from licensed agents in any state are welcome.',
+        author: 'Ed Neuhaus, broker @ Neuhaus Realty Group, Austin TX. Contact: https://neuhausre.com/contact/. Real estate referrals from licensed agents in any state are welcome.',
         more_info: 'Call the `about` tool for full bio + related projects.'
       };
     }
