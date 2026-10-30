@@ -6955,10 +6955,10 @@ export async function startHttp(opts = {}) {
   }
 
   function constantTimeEq(a, b) {
-    const ab = Buffer.from(String(a));
-    const bb = Buffer.from(String(b));
-    if (ab.length !== bb.length) return false;
-    return timingSafeEqual(ab, bb);
+    // Hash both sides first so the compare takes the same time whatever the length.
+    const ah = createHash('sha256').update(String(a)).digest();
+    const bh = createHash('sha256').update(String(b)).digest();
+    return timingSafeEqual(ah, bh);
   }
 
   // Wrong-password lockout for POST /oauth/authorize. Per client IP, plus a
@@ -6974,13 +6974,50 @@ export async function startHttp(opts = {}) {
     if (list.length) authFails.set(key, list); else authFails.delete(key);
     return list;
   };
+  const lockKey = (ip) => {
+    const a = String(ip || '');
+    const v4 = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+    if (v4) return v4[1];
+    if (!a.includes(':')) return a;
+    // Expand :: and keep the first 4 groups (the /64 network).
+    const [head, tail = ''] = a.split('::');
+    const h = head ? head.split(':') : [];
+    const t = tail ? tail.split(':') : [];
+    const groups = a.includes('::') ? [...h, ...Array(8 - h.length - t.length).fill('0'), ...t] : h;
+    return groups.slice(0, 4).map(g => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+  };
   const authLocked = (ip) =>
-    recentAuthFails(ip).length >= AUTH_MAX_FAILS || recentAuthFails('*').length >= AUTH_GLOBAL_MAX_FAILS;
+    recentAuthFails(lockKey(ip)).length >= AUTH_MAX_FAILS || recentAuthFails('*').length >= AUTH_GLOBAL_MAX_FAILS;
   const recordAuthFail = (ip) => {
     const now = Date.now();
-    for (const key of [ip, '*']) authFails.set(key, [...recentAuthFails(key), now]);
+    for (const key of [lockKey(ip), '*']) authFails.set(key, [...recentAuthFails(key), now]);
   };
   setInterval(() => { for (const k of [...authFails.keys()]) recentAuthFails(k); }, 60 * 1000).unref();
+
+  // Caddy on-demand TLS "ask" check (MCP_CADDY_ASK=true, set by deploy/hostinger).
+  // Allows a certificate only for this server's Hostinger name or DOMAIN, and only
+  // after a request to that name on port 80 reaches this same process.
+  if (process.env.MCP_CADDY_ASK === 'true') {
+    const selfToken = randomBytes(16).toString('hex');
+    const domain = (process.env.DOMAIN || '').trim().toLowerCase();
+    const selfPort = process.env.MCP_SELF_CHECK_PORT || '80';
+    const askCache = new Map(); // name -> { ok, until }
+    app.get('/.well-known/fub-mcp-self', (_req, res) => res.type('text/plain').send(selfToken));
+    app.get('/caddy-ask', async (req, res) => {
+      const name = String(req.query.domain || '').toLowerCase();
+      const shapeOk = /^srv[0-9]+\.hstgr\.cloud$/.test(name) || (domain && name === domain);
+      if (!shapeOk) return res.sendStatus(403);
+      const hit = askCache.get(name);
+      if (hit && hit.until > Date.now()) return res.sendStatus(hit.ok ? 200 : 403);
+      let ok = false;
+      try {
+        const r = await fetch(`http://${name}:${selfPort}/.well-known/fub-mcp-self`, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
+        ok = r.ok && (await r.text()).trim() === selfToken;
+      } catch { ok = false; }
+      askCache.set(name, { ok, until: Date.now() + (ok ? 24 * 3600e3 : 10 * 60e3) });
+      res.sendStatus(ok ? 200 : 403);
+    });
+  }
 
   // Health endpoint (no auth)
   app.get('/health', (_req, res) => {
@@ -7023,6 +7060,18 @@ export async function startHttp(opts = {}) {
     });
   });
 
+  const MAX_CLIENTS = parseInt(process.env.MCP_OAUTH_MAX_CLIENTS || '500', 10);
+  const MAX_REDIRECT_URIS = 10;
+  function validRedirectUri(u) {
+    if (typeof u !== 'string' || u.length > 2048) return false;
+    let url;
+    try { url = new URL(u); } catch { return false; }
+    if (url.protocol === 'https:') return true;
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  }
+  // Where the sign-in sends the user back to, shown on the password form.
+  const TRUSTED_REDIRECT_HOSTS = new Set(['claude.ai', 'claude.com', 'localhost', '127.0.0.1', '[::1]']);
+
   // OAuth: Dynamic Client Registration (RFC 7591). Claude registers itself
   // dynamically; we hand back a client_id with no secret (public client).
   app.post('/oauth/register', (req, res) => {
@@ -7030,6 +7079,12 @@ export async function startHttp(opts = {}) {
     const redirect_uris = Array.isArray(req.body?.redirect_uris) ? req.body.redirect_uris : [];
     if (!redirect_uris.length) {
       return res.status(400).json({ error: 'invalid_redirect_uri', error_description: 'redirect_uris is required' });
+    }
+    if (redirect_uris.length > MAX_REDIRECT_URIS || !redirect_uris.every(validRedirectUri)) {
+      return res.status(400).json({ error: 'invalid_redirect_uri', error_description: 'redirect_uris must be https URLs, or http on localhost (at most 10)' });
+    }
+    if (clients.size >= MAX_CLIENTS) {
+      return res.status(429).json({ error: 'too_many_clients', error_description: 'Client limit reached. Restart the server with a new MCP_OAUTH_STORE_PATH to clear old clients.' });
     }
     const client_id = randomBytes(16).toString('hex');
     const now = Math.floor(Date.now() / 1000);
@@ -7057,6 +7112,8 @@ export async function startHttp(opts = {}) {
     if (response_type !== 'code') return res.status(400).send('Only response_type=code supported');
     if (code_challenge_method !== 'S256') return res.status(400).send('Only S256 PKCE supported');
     if (!code_challenge) return res.status(400).send('code_challenge required');
+    const returnHost = new URL(redirect_uri).host;
+    const trusted = TRUSTED_REDIRECT_HOSTS.has(new URL(redirect_uri).hostname);
 
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!DOCTYPE html>
@@ -7077,7 +7134,8 @@ export async function startHttp(opts = {}) {
 <body>
   <form class="card" method="POST" action="/oauth/authorize">
     <h1>Follow Up Boss MCP</h1>
-    <p>Sign in to authorize <strong>${esc(client_id).slice(0,8)}…</strong> to access your FUB CRM tools.</p>
+    <p>Sign in to give <strong>${esc(returnHost)}</strong> access to your Follow Up Boss tools.</p>
+    ${trusted ? '' : `<div class="err">${esc(returnHost)} is not Claude. Type your password only if you started this connection yourself.</div>`}
     ${req.query.err ? `<div class="err">${esc(req.query.err)}</div>` : ''}
     <input type="hidden" name="client_id" value="${esc(client_id)}">
     <input type="hidden" name="redirect_uri" value="${esc(redirect_uri)}">
@@ -7086,7 +7144,7 @@ export async function startHttp(opts = {}) {
     <label for="pw">Password</label>
     <input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>
     <button type="submit">Authorize</button>
-    <div class="meta">This server runs in SAFE MODE${FUB_SAFE_MODE ? '' : ' (disabled)'} — delete operations are blocked.</div>
+    <div class="meta">${FUB_SAFE_MODE ? 'Safe Mode is on: delete tools are blocked.' : 'Safe Mode is off: delete tools are allowed.'}</div>
   </form>
 </body></html>`);
   });

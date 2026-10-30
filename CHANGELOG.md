@@ -2,35 +2,110 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased (v2.0.0)
+## v2.0.0 — Unreleased
+
+The biggest release so far. One click now gives you your own server for
+Claude on the web, desktop and phone, and every tool was checked against the
+Follow Up Boss API docs and a live account.
+
+### Upgrade notes (read first)
+
+- **Node.js 20 or newer is required** (the MCP SDK v2 needs it). Claude
+  Desktop's `.mcpb` install and the Docker image already include it.
+- **The HTTP server no longer keeps sessions.** Every request stands alone, so
+  restarts and load balancers no longer break a client. No `Mcp-Session-Id` is
+  sent; clients that send an old one still work.
+- **Browser origins are checked.** Requests from a web page are accepted only
+  from `claude.ai` and `claude.com` unless you set `MCP_ALLOWED_ORIGINS`.
+  Desktop apps and CLIs send no origin and are not affected.
+- **Four delete tools need one more input**, because Follow Up Boss refuses the
+  delete without it: `deleteStage` (`assignStageId`), `deleteAppointmentType`
+  (`assignTypeId`), `deleteAppointmentOutcome` (`assignOutcomeId`) and
+  `deletePond` (`assignTo`). Before 2.0 these tools always failed.
 
 ### Added
 
-- **One-click install on Hostinger.** A Deploy on Hostinger button sets up
-  your own server with HTTPS (Caddy) and connects to Claude on the web,
-  desktop or phone. See `deploy/hostinger/`.
+- **One-click install on Hostinger.** The Deploy on Hostinger button sets up
+  your own server with HTTPS (Caddy) and a password login, then you add it to
+  Claude as a connector. About 15 minutes, no terminal. See
+  `deploy/hostinger/`.
 - **Docker image** at `ghcr.io/mindwear-capitian/followupboss-mcp-server`,
-  built on each release tag.
-- **Wrong-password lockout.** Five wrong passwords from one address lock it
-  out for 15 minutes (`MCP_AUTH_MAX_FAILS`, `MCP_AUTH_LOCK_MINUTES`), with a
-  server-wide cap of 50 (`MCP_AUTH_GLOBAL_MAX_FAILS`).
-- **`MCP_REQUIRE_AUTH=true`** refuses to start without a password of 12 or
-  more characters. The Docker image sets it.
-- **`MCP_TRUST_PROXY`** for installs behind a reverse proxy.
+  built for amd64 and arm64 on each release tag.
+- **Password login for remote use** (OAuth 2.1 with PKCE). Five wrong
+  passwords from one address lock it out for 15 minutes
+  (`MCP_AUTH_MAX_FAILS`, `MCP_AUTH_LOCK_MINUTES`), with a server-wide cap of
+  50 (`MCP_AUTH_GLOBAL_MAX_FAILS`). `MCP_REQUIRE_AUTH=true` refuses to start
+  without a password of 12 or more characters; the Docker image sets it.
+  `MCP_TRUST_PROXY` is for installs behind a reverse proxy.
+- **Both MCP protocol versions.** Clients on the 2026-07-28 spec and clients on
+  the 2025-11-25 spec both work. `MCP_LEGACY=reject` serves the new spec only.
+- **Tool groups.** `FUB_TOOL_GROUPS` loads only the groups you want (`core`,
+  `setup`, `marketing`, `integrations`, `delete`; default all), so the AI sees
+  fewer tools.
+- **Tool annotations** on every tool (read-only, destructive, idempotent), so
+  Claude can let read-only tools run without asking and always asks before a
+  delete. Seven everyday tools are marked to load up front in Claude Code
+  (`FUB_ALWAYS_LOAD`).
+- **Server instructions** that tell the AI how to answer common questions in
+  one call (new leads, today's tasks, appointments, deals).
+- **`npm run test:live`** calls every tool against your own account. Writes go
+  only to a test contact you name (`TEST_PERSON_ID`) or to records the test
+  makes and deletes.
+
+### Changed
+
+- **99 tool descriptions rewritten to match the Follow Up Boss API docs**,
+  with each input's real name, type and default.
+- **`listPeople` lists the newest contacts first** by default
+  (`sort=-created`).
+- **List tools page past 10 rows.** `listStages`, `listPipelines`,
+  `listPonds`, `listGroups`, `listTeams`, `listTeamInboxes`, `listWebhooks`,
+  `listAppointmentTypes`, `listAppointmentOutcomes`, `listTimeframes` and
+  `listInboxAppInstallations` accept `limit`, `offset` and `next`, and return
+  100 rows by default (FUB's default is 10).
+- **`help` shows the real version** and the input rules for paging, sorting,
+  stages and fields.
 
 ### Fixed
 
-- **11 list tools returned only the first 10 rows.** `listStages`,
-  `listPipelines`, `listPonds`, `listGroups`, `listTeams`, `listTeamInboxes`,
-  `listWebhooks`, `listAppointmentTypes`, `listAppointmentOutcomes`,
-  `listTimeframes` and `listInboxAppInstallations` sent no paging inputs, so
-  FUB's default page of 10 was all an agent could see. They now accept
-  `limit`, `offset` and `next`, and default to 100 rows.
-- **`listPeople` inputs were undocumented.** `sort` lists the valid fields
-  (FUB silently ignores an unknown one), `stage` says it takes a stage name,
-  not an ID.
-- **`help` reported v1.2.0.** It now reads the version from `package.json`
-  and lists the input rules for paging, sorting, stages and fields.
+- **Appointment invitees were dropped.** FUB accepts `[{type, id}]` without an
+  error but ignores it. The tools now send `[{userId}]` / `[{personId}]` and
+  convert the old shape.
+- **`createPipeline` returned a server error** and made a pipeline with no
+  stages when a stage had no `closedStage`. It now defaults to `false`.
+- **`updateTemplate`, `updateTextMessageTemplate` and `updateGroup` failed on
+  partial updates**, because FUB requires subject and body, message, and users
+  on every update. The tools now keep the current values you did not send.
+- **Inbox app tools used the wrong paths**; groups now send `users`;
+  reactions send `body`; round-robin filters pass through; attachments and
+  webhooks check for system credentials before calling FUB.
+- **Appointment invitations are opt-in.** `createAppointment` emails invitees
+  only with `sendInvitation=true`; `updateAppointment` never sends them.
+- **`listTextMessages`** now says that FUB needs at least one filter.
+
+### Security
+
+- **HTTPS certificates only for this server.** The Hostinger setup asks the
+  server before Caddy gets a certificate. It allows only this server's
+  Hostinger name or `DOMAIN`, and only when that name points at this server.
+- **The sign-in page shows where it sends you back to**, and warns when that
+  is not Claude. Client registration accepts only https return addresses, or
+  http on this computer, with a cap of 500 clients (`MCP_OAUTH_MAX_CLIENTS`).
+- **The lockout counts an IPv6 network (/64) as one address**, so a new
+  address in the same network does not reset it.
+- Password compare takes the same time for any length.
+- Updated `axios`, `body-parser`, `qs`, `zod`, `hono`, `@hono/node-server`,
+  `follow-redirects` and `proxy-addr`. `npm audit` reports 0 issues.
+
+### Tested
+
+- Offline suites (Safe Mode, Full Access, MCP errors, email lookup, overlay
+  import, tool fixes, both protocol versions).
+- 44-check HTTP test against a real account: bearer and password login,
+  token reuse, PKCE, restart with a saved login store.
+- A live call of 132 of the 160 tools against a real account. The rest were
+  skipped on purpose (they can message a contact, start a lead flow, or leave
+  a record FUB cannot delete) or need data the test account does not have.
 
 ## v1.5.3 — 2026-09-24
 

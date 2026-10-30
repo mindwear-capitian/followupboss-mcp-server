@@ -1,7 +1,7 @@
 # Follow Up Boss MCP Server: one-click deploy on a Hostinger VPS.
 #
 # Set two values in Docker Manager before you deploy:
-#   FUB_API_KEY        your Follow Up Boss API key (FUB: Admin > API)
+#   FUB_API_KEY        your Follow Up Boss API key (FUB: Admin > Integrations > API Keys & Lead Email)
 #   MCP_AUTH_PASSWORD  a password you make up, 12+ characters; Claude asks for it once
 #
 # Caddy gets a free HTTPS certificate for your server's Hostinger address
@@ -22,6 +22,8 @@ services:
       FUB_SYSTEM: ${FUB_SYSTEM:-}
       FUB_SYSTEM_KEY: ${FUB_SYSTEM_KEY:-}
       MCP_TRUST_PROXY: "1"
+      MCP_CADDY_ASK: "true"
+      DOMAIN: ${DOMAIN:-}
     volumes:
       - mcp-data:/data
 
@@ -38,22 +40,32 @@ services:
       CADDYFILE: |
         {
         	on_demand_tls {
-        		ask http://127.0.0.1:5555/allowed
+        		ask http://mcp:3000/caddy-ask
         	}
         }
 
-        # Certificates only for this server's Hostinger address or DOMAIN.
-        http://127.0.0.1:5555 {
-        	@ok vars_regexp {query.domain} ^(srv[0-9]+\.hstgr\.cloud|{$$DOMAIN})$$
-        	respond @ok 200
-        	respond 403
+        # Port 80: the self-check the certificate ask uses, then HTTPS.
+        http:// {
+        	handle /.well-known/fub-mcp-self {
+        		reverse_proxy mcp:3000
+        	}
+        	handle {
+        		redir https://{host}{uri} 308
+        	}
         }
 
+        # Certificates only for this server's Hostinger address or DOMAIN,
+        # and only when that name points at this server.
         https:// {
         	tls {
         		on_demand
         	}
-        	reverse_proxy mcp:3000
+        	handle /caddy-ask* {
+        		respond 404
+        	}
+        	handle {
+        		reverse_proxy mcp:3000
+        	}
         }
     command: ["sh", "-c", "printf '%s' \"$$CADDYFILE\" > /etc/caddy/Caddyfile && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
     volumes:
