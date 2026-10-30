@@ -4,7 +4,7 @@ Talk to your Follow Up Boss CRM from Claude on the web, desktop or phone. This p
 
 No coding. About 15 minutes.
 
-[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostinger.com/docker-hosting?compose_url=https%3A%2F%2Fraw.githubusercontent.com%2Fmindwear-capitian%2Ffollowupboss-mcp-server%2Fmain%2Fdeploy%2Fhostinger%2Fdocker-compose.yml&REFERRALCODE=LKDTGEDSNSTG)
+[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostg.xyz/aff_c?offer_id=815&aff_id=245188&url=https%3A%2F%2Fwww.hostinger.com%2Fdocker-hosting%3Fcompose_url%3Dhttps%253A%252F%252Fraw.githubusercontent.com%252Fmindwear-capitian%252Ffollowupboss-mcp-server%252Fmain%252Fdeploy%252Fhostinger%252Fdocker-compose.yml)
 
 ## Before you start
 
