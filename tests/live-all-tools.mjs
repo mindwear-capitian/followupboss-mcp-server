@@ -223,10 +223,10 @@ if (pipe) {
 
 // webhook (rare event, URL on our own domain)
 if (HAS_SYSTEM) {
-  const wh = await call('createWebhook', { event: 'peopleDeleted', url: '${WEBHOOK_TEST_URL}' });
+  const wh = await call('createWebhook', { event: 'peopleDeleted', url: WEBHOOK_TEST_URL });
   if (wh) {
     await call('getWebhook', { id: wh.id });
-    await call('updateWebhook', { id: wh.id, url: '${WEBHOOK_TEST_URL}-2' });
+    await call('updateWebhook', { id: wh.id, url: `${WEBHOOK_TEST_URL}-2` });
     await call('getWebhookEvents', { id: wh.id }, { expectError: true });
     cleanup.push(['deleteWebhook', wh.id]);
   }
