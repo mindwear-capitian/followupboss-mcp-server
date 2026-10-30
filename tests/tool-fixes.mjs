@@ -35,7 +35,7 @@ c = await run('createGroup', { name: 'g', userIds: [1] });
 assert.deepStrictEqual(c.args[1].users, [1]);
 
 // Tool list: no duplicates, annotations on all, alwaysLoad on hot tools, extras replace built-ins.
-const extra = [{ name: 'mergeTemplate', description: 'private', inputSchema: { type: 'object', properties: {} } },
+const extra = [{ name: 'mergeTemplate', description: 'custom', inputSchema: { type: 'object', properties: {} } },
                { name: 'sendNotification', description: 'custom', inputSchema: { type: 'object', properties: {} } }];
 const names = m.activeTools.map(t => t.name);
 assert.strictEqual(new Set(names).size, names.length, 'no duplicate engine names');
