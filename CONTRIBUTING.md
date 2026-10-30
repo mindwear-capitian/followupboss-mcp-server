@@ -42,7 +42,7 @@ If the bug exposes data or has a security impact, see [SECURITY.md](SECURITY.md)
 1. Fork the repo
 2. Create a branch (`git checkout -b fix/listSmartLists-something`)
 3. Make your changes in `index.js`
-4. Sanity check: `node -c index.js` (syntax) and `npm test` (basic startup test)
+4. Run the tests: `npm run test:offline` (no FUB account needed). With a test contact you own, `TEST_PERSON_ID=<id> npm run test:live` calls every tool against your account.
 5. Commit with a message that explains the **why**, not just the **what**
 6. Push and open a Pull Request
 
