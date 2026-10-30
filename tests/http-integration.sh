@@ -7,6 +7,7 @@
 # Required env: FUB_API_KEY
 # Optional env: TEST_HOST (default: localhost), TEST_PORT (default: 3999),
 #               SKIP_WRITE=1 skips the notes create+delete roundtrip
+#               TEST_PERSON_ID=<id> test contact for the write roundtrip (required unless SKIP_WRITE=1)
 
 set -u
 PASS=0
@@ -120,12 +121,9 @@ if [ "${SKIP_WRITE:-}" = "1" ]; then
 else
 # Note: SSE responses wrap FUB JSON in an escaped string. Parse the ESCAPED inner
 # id (\"id\": N) — NOT the outer JSON-RPC envelope id.
-PEOPLE_RESP=$(curl -s -X POST "$BASE/mcp" \
-  -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -H "Mcp-Session-Id: $SESSION" \
-  -d '{"jsonrpc":"2.0","id":100,"method":"tools/call","params":{"name":"listPeople","arguments":{"limit":1}}}')
-TEST_PID=$(echo "$PEOPLE_RESP" | grep -oE '\\"id\\": *[0-9]+' | head -1 | grep -oE '[0-9]+')
-if [ -z "$TEST_PID" ]; then bad "could not parse test person id from listPeople"; TEST_PID=0; fi
+# Writes go ONLY to the contact in TEST_PERSON_ID (a test contact you own). Never a real lead.
+TEST_PID="${TEST_PERSON_ID:-}"
+if [ -z "$TEST_PID" ]; then bad "TEST_PERSON_ID not set (or set SKIP_WRITE=1)"; TEST_PID=0; fi
 
 NOTE_RESP=$(curl -s -X POST "$BASE/mcp" \
   -H "Authorization: Bearer $BEARER" -H "Content-Type: application/json" \
