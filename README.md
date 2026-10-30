@@ -12,6 +12,24 @@ No terminal needed. Get your own server and connect it to Claude on the web, des
 
 Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
 
+### Three ways to install
+
+| Way | Needs a server? | Works in | Setup |
+|---|---|---|---|
+| **Deploy on Hostinger** (button above) | Yes, your own Hostinger VPS | Claude on the web, desktop and phone | About 15 minutes, no terminal |
+| **Claude Desktop file** | No, it runs on your computer | Claude Desktop | Download the `.mcpb` file from the [latest release](https://github.com/mindwear-capitian/followupboss-mcp-server/releases/latest) and double-click it |
+| **Install it yourself** (npm or Docker) | Your computer or any server | Any MCP tool | [Setup](#setup-5-minutes) below |
+
+### New in 2.0
+
+- **One-click install on Hostinger**, with HTTPS and a password login built in.
+- **Every tool checked against the Follow Up Boss API docs and a live account.** 99 tool descriptions rewritten, and the tools that FUB used to reject now work.
+- **Faster, steadier connections.** The server keeps no sessions, so a restart never drops Claude, and it speaks both the new and the old MCP protocol versions.
+- **Fewer tools when you want them.** `FUB_TOOL_GROUPS` loads only the groups you use, and every tool tells Claude whether it only reads or makes changes.
+- **New leads first.** `listPeople` lists the newest contacts first.
+
+Full list: [CHANGELOG](CHANGELOG.md).
+
 ### Other things I'm working on
 
 - **[EdNeuhaus.com](https://edneuhaus.com)** — My builder profile, more on how this one's built: [edneuhaus.com/projects/fub-mcp/](https://edneuhaus.com/projects/fub-mcp/)
@@ -26,7 +44,7 @@ Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
 2. **Write about it.** Blog post, LinkedIn, X — tag me and link to neuhausre.com.
 3. **Open an issue or PR** if you find a bug or build something useful.
 
-> **WARNING: This tool has full read AND write access to your Follow Up Boss account.** It can create, update, and **delete** contacts, deals, tasks, notes, and other data in your CRM. **Strongly recommended: back up your FUB data before turning this loose, unless you really know what you're doing.** Always review AI-suggested actions before confirming changes to live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
+> **WARNING: This tool can read AND change your Follow Up Boss account.** It can create and update contacts, deals, tasks, notes, and other data in your CRM. Delete tools are off unless you turn off Safe Mode. **Strongly recommended: back up your FUB data before turning this loose, unless you really know what you're doing.** Always review AI-suggested actions before confirming changes to live data. The authors are not responsible for any data loss or unintended modifications to your FUB account.
 
 > ### ⚠️ READ BEFORE SETTING `FUB_SYSTEM` / `FUB_SYSTEM_KEY` — TOS RISK
 >
@@ -72,7 +90,7 @@ This server acts as a bridge between your Follow Up Boss account and AI tools li
 
 1. **A Follow Up Boss account** with API access (most paid plans include this)
 2. **Claude Desktop**, **Claude Code**, or any MCP-compatible AI tool
-3. **Node.js 18 or higher** -- This is a free tool that runs JavaScript. If you don't have it, download it from [nodejs.org](https://nodejs.org/) (choose the LTS version)
+3. **Node.js 20 or higher** -- This is a free tool that runs JavaScript. If you don't have it, download it from [nodejs.org](https://nodejs.org/) (choose the LTS version)
 
 ## Setup (5 Minutes)
 
@@ -81,8 +99,8 @@ This server acts as a bridge between your Follow Up Boss account and AI tools li
 Your API key is like a password that lets this server talk to your FUB account.
 
 1. Log into [Follow Up Boss](https://app.followupboss.com)
-2. Go to **Admin** (top menu) > **API**
-3. Copy your API key (it looks like a long string of letters and numbers)
+2. Go to **Admin** (top menu) > **Integrations** > **API Keys & Lead Email**
+3. Click **Create API Key**, name it `Claude`, and copy the key (a long string of letters and numbers)
 
 ### Step 2: Download & Install
 
@@ -461,7 +479,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 ### Text Messages (3 tools)
 | Tool | Description |
 |------|-------------|
-| `listTextMessages` | List text messages |
+| `listTextMessages` | List text messages (needs one filter, e.g. personId) |
 | `createTextMessage` | Send a text message |
 | `getTextMessage` | Get a text message by ID |
 
@@ -541,7 +559,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | `createStage` | Create a stage |
 | `getStage` | Get a stage by ID |
 | `updateStage` | Update a stage |
-| `deleteStage` | Delete a stage |
+| `deleteStage` | Delete a stage (moves its people to `assignStageId`) |
 
 ### Tasks (5 tools)
 | Tool | Description |
@@ -568,7 +586,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | `createAppointmentType` | Create a type |
 | `getAppointmentType` | Get a type by ID |
 | `updateAppointmentType` | Update a type |
-| `deleteAppointmentType` | Delete a type |
+| `deleteAppointmentType` | Delete a type (moves its appointments to `assignTypeId`) |
 
 ### Appointment Outcomes (5 tools)
 | Tool | Description |
@@ -577,7 +595,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | `createAppointmentOutcome` | Create an outcome |
 | `getAppointmentOutcome` | Get an outcome by ID |
 | `updateAppointmentOutcome` | Update an outcome |
-| `deleteAppointmentOutcome` | Delete an outcome |
+| `deleteAppointmentOutcome` | Delete an outcome (moves its appointments to `assignOutcomeId`) |
 
 ### Webhooks (6 tools)
 | Tool | Description |
@@ -655,7 +673,7 @@ Once connected, just talk to your AI tool normally. Here are some things you can
 | `createPond` | Create a pond |
 | `getPond` | Get a pond by ID |
 | `updatePond` | Update a pond |
-| `deletePond` | Delete a pond |
+| `deletePond` | Delete a pond (gives its people to user `assignTo`) |
 
 ### Timeframes (1 tool)
 | Tool | Description |
@@ -720,12 +738,12 @@ The `bulkUpdatePeople` tool also adds a built-in pause every 20 operations to st
 ## Troubleshooting
 
 **"Cannot connect" or "Connection refused"**
-- Make sure Node.js is installed: run `node --version` in your terminal (should show v18 or higher)
+- Make sure Node.js is installed: run `node --version` in your terminal (should show v20 or higher)
 - Make sure you ran `npm install` in the project folder
 - Double-check the file path in your Claude config
 
 **"Invalid API key" or "401 Unauthorized"**
-- Re-check your API key in FUB: Admin > API
+- Re-check your API key in FUB: Admin > Integrations > API Keys & Lead Email
 - Make sure there are no extra spaces when you copy/paste
 - Run `npm run setup` again to test your key
 
@@ -742,7 +760,7 @@ The `bulkUpdatePeople` tool also adds a built-in pause every 20 operations to st
 
 **Is my data safe?**
 
-Yes. This server runs entirely on your computer. Your API key stays in a local file on your machine and is never sent anywhere except directly to Follow Up Boss's official API. No data passes through any third-party servers.
+Yes. This server runs on your computer, or on your own server if you use the Hostinger install. Your API key stays there and is sent only to Follow Up Boss's official API. No data passes through anyone else's servers, including ours.
 
 **Does this cost anything?**
 
@@ -750,7 +768,7 @@ This server is free and open source. You just need a Follow Up Boss account with
 
 **Can Claude modify my FUB data?**
 
-Yes, Claude can create, update, and delete records in your FUB account. Claude will typically confirm before making changes, especially for deletions. If you want read-only access, you can create a restricted API key in FUB.
+Yes, Claude can create and update records in your FUB account. Delete tools are off by default (Safe Mode). Every tool tells Claude whether it changes data, so Claude asks before it makes a change. If you want read-only access, you can create a restricted API key in FUB.
 
 **Where are the call recording URLs?**
 
@@ -771,7 +789,7 @@ Contributions are welcome! Here's how:
 1. Fork this repository
 2. Create a feature branch: `git checkout -b my-feature`
 3. Make your changes
-4. Test them: `node -c index.js` (syntax check)
+4. Test them: `npm run test:offline` (no FUB account needed). If you have a test contact, `TEST_PERSON_ID=<id> npm run test:live` calls every tool against your own account.
 5. Commit: `git commit -m "Add my feature"`
 6. Push: `git push origin my-feature`
 7. Open a Pull Request
