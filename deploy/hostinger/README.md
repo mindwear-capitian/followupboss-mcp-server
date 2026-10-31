@@ -4,7 +4,7 @@ Talk to your Follow Up Boss CRM from Claude on the web, desktop or phone. This p
 
 No coding. About 15 minutes.
 
-[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostg.xyz/aff_c?offer_id=815&aff_id=245188&url=https%3A%2F%2Fwww.hostinger.com%2Fdocker-hosting%3Fcompose_url%3Dhttps%253A%252F%252Fraw.githubusercontent.com%252Fmindwear-capitian%252Ffollowupboss-mcp-server%252Fmain%252Fdeploy%252Fhostinger%252Fdocker-compose.yml)
+[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostg.xyz/aff_c?offer_id=815&aff_id=245188&url=https%3A%2F%2Fwww.hostinger.com%2Fdocker-hosting%3Fcompose_url%3Dhttps%253A%252F%252Fraw.githubusercontent.com%252Fmindwear-capitian%252Ffollowupboss-mcp-server%252Fmain%252Fdeploy%252Fhostinger%252Fdocker-compose.yml%23pricing)
 
 *Affiliate link: if you buy through this button, Hostinger pays the author a commission. Your price is the same. The software is free; the server is a paid Hostinger plan.*
 
@@ -31,7 +31,7 @@ Make up a password of **12 or more characters**. Write it in your notes. You typ
 ## Step 3: Buy the server
 
 1. Click the **Deploy on Hostinger** button at the top of this page.
-2. Scroll down to the plan cards. On the first card, **KVM 1**, click **Choose plan**. KVM 1 is the smallest plan and is more than enough. (You do not need the purple "Most popular" plan.)
+2. Hostinger opens at the plan cards. On the first card, **KVM 1**, click **Choose plan**. KVM 1 is the smallest plan and is more than enough. (You do not need the purple "Most popular" plan.)
 3. In the cart:
    - **Period:** any length you want.
    - **Daily auto-backup:** not needed.
