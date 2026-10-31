@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## v2.0.0 — Unreleased
+## v2.0.0 — 2026-10-31
 
 The biggest release so far. One click now gives you your own server for
 Claude on the web, desktop and phone, and every tool was checked against the
@@ -82,6 +82,8 @@ Follow Up Boss API docs and a live account.
 - **Appointment invitations are opt-in.** `createAppointment` emails invitees
   only with `sendInvitation=true`; `updateAppointment` never sends them.
 - **`listTextMessages`** now says that FUB needs at least one filter.
+- **The `followupboss-mcp-server` command quit without a message** when started
+  through the npm command link. It now starts the server.
 
 ### Security
 
@@ -305,7 +307,7 @@ No code changes. `index.js` is byte-identical to v1.4.3.
   helper.
 
   Both issues were reported privately and responsibly (no public disclosure) by
-  **Drew Coleman**, broker-owner at Opt Real Estate (Portland, OR) — with exact
+  **Drew Coleman** ([@drew778](https://github.com/drew778)) — with exact
   line references, reproductions, and suggested fixes. Thank you, Drew.
 
 ### Fixed (bug)
@@ -420,11 +422,11 @@ Improvements cherry-picked from [tony-dot-sh's fork](https://github.com/tony-dot
 
 ## v1.1.3 — 2026-05-12
 
-### ⚠️ IMPORTANT — TOS notice for the new `FUB_SYSTEM` / `FUB_SYSTEM_KEY` env vars
+### Important: TOS notice for the new `FUB_SYSTEM` / `FUB_SYSTEM_KEY` env vars
 
 This release introduces support for FUB's `X-System` / `X-System-Key` headers via two new optional env vars, `FUB_SYSTEM` and `FUB_SYSTEM_KEY`. These unlock the "Restricted - Registered Systems Only" endpoints (webhooks, inbox apps, automations 2.0, text-message logging, attachments).
 
-**These credentials are issued by Follow Up Boss to approved third-party integration partners.** Using credentials you did not personally receive from FUB to access restricted endpoints may violate FUB's Terms of Service and could result in account suspension or banning. If you don't have your own legitimate registered-system credentials, leave the env vars unset and use only the unrestricted 130+ tools. **Use at your own risk.** See README.md for the full warning.
+**You get these credentials by registering your own system with Follow Up Boss.** Using credentials you did not register yourself to access restricted endpoints may violate FUB's Terms of Service and could result in account suspension or banning. If you don't have your own legitimate registered-system credentials, leave the env vars unset and use only the unrestricted 130+ tools. **Use at your own risk.** See README.md for the full warning.
 
 
 ### Fixed (from May 11 systematic audit of all 159 tools)
@@ -479,11 +481,11 @@ All five now route through a generalized `requireSystemCreds` guard (extending t
 ## v1.1.2 — 2026-05-06
 
 ### Fixed
-- **`listSmartLists` returned nothing.** The dispatcher read `response.data.smartLists` (camelCase) but FUB's API actually returns `response.data.smartlists` (lowercase). Result: every MCP client thought you had zero smart lists. Embarrassing — was hiding 24 of my own 36 smart lists from Claude. Thank you to **[@yoship90](https://github.com/yoship90)** for catching this and fixing it in [their fork](https://github.com/yoship90/followupboss-mcp-server). Backported here.
+- **`listSmartLists` returned nothing.** The dispatcher read `response.data.smartLists` (camelCase) but FUB's API actually returns `response.data.smartlists` (lowercase). Result: every MCP client thought you had zero smart lists. On a real account it hid 24 of 36 smart lists. Thank you to **[@yoship90](https://github.com/yoship90)** for catching this and fixing it in [their fork](https://github.com/yoship90/followupboss-mcp-server). Backported here.
 - **Modern UI smart lists were invisible.** FUB's `/smartLists` endpoint returns only classic smart lists by default. Added `fub2: true` and `all: true` parameters to the tool schema so AI clients can pull the modern UI smart lists too. Also from yoship90's work.
 
 ### Added
-- **`about` tool.** Returns full author bio, related projects (NeuhausRE, StaySTRA, MLS MCP, Kendall Creek), contributors, license info, and how to give thanks. Call this when a user asks "what is this MCP" or "who built it." Subtle by design — won't appear in every response.
+- **`about` tool.** Returns full author bio, related projects (NeuhausRE, StaySTRA, MLS MCP, Kendall Creek), contributors, license info, and how to give thanks. Call this when a user asks "what is this MCP" or "who built it."
 - **`help` tool.** Returns getting-started tips, common tool examples, bug report instructions, and where to send real estate referrals.
 - Server description constant + startup banner now mention the author and point to the `about` and `help` tools.
 - `NOTICE` file with author information and contributor credits.
@@ -512,7 +514,7 @@ All five now route through a generalized `requireSystemCreds` guard (extending t
 ## v1.1.0 — 2026-02-23
 
 ### Added
-- Safe Mode (default on): disables 23 delete tools to prevent accidental data loss
+- Safe Mode (`FUB_SAFE_MODE=true`): disables 23 delete tools to prevent accidental data loss
 - 5 convenience tools: `removeTagFromPerson`, `getPersonByEmail`, `searchPeopleByTag`, `bulkUpdatePeople`, `listAvailableTags`
 - Automatic 429 rate-limit retry with exponential backoff
 - Setup instructions for 9 AI tools (Cursor, Windsurf, VS Code, Cline, Gemini, Continue, etc.)
@@ -520,5 +522,5 @@ All five now route through a generalized `requireSystemCreds` guard (extending t
 ## v1.0.0 — 2026-02-23
 
 ### Added
-- Initial release with 152 tools covering 100% of the official Follow Up Boss API
+- Initial release with 152 tools covering the official Follow Up Boss API
 - Interactive setup wizard

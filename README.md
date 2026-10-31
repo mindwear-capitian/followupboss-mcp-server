@@ -20,7 +20,7 @@ Step-by-step guide: [deploy/hostinger](deploy/hostinger/README.md)
 |---|---|---|---|
 | **Deploy on Hostinger** (button above) | Yes, your own Hostinger VPS | Claude on the web, desktop and phone | About 15 minutes, no terminal |
 | **Claude Desktop file** | No, it runs on your computer | Claude Desktop | Download the `.mcpb` file from the [latest release](https://github.com/mindwear-capitian/followupboss-mcp-server/releases/latest) and double-click it. Claude Desktop asks for your FUB API key. |
-| **Install it yourself** (npm or Docker) | Your computer or any server | Any MCP tool | [Install it yourself](#install-it-yourself) below (uses Terminal) |
+| **Install it yourself** (download the code, or Docker) | Your computer or any server | Any MCP tool | [Install it yourself](#install-it-yourself) below (uses Terminal) |
 
 ### New in 2.0
 
@@ -63,7 +63,7 @@ Full list: [CHANGELOG](CHANGELOG.md).
 > - Use a name you did not register to reach restricted endpoints.
 > - Borrow a partner's credentials.
 >
-> **Doing any of the above to access restricted endpoints may violate Follow Up Boss's Terms of Service and could get your FUB account suspended or banned, with no notice.** FUB's rate-limit + identification policy is documented at https://docs.followupboss.com/reference#identification.
+> **Doing any of the above to access restricted endpoints may violate Follow Up Boss's Terms of Service and may lead to the suspension of your FUB account.** FUB's rate-limit + identification policy is documented at https://docs.followupboss.com/reference/identification.
 >
 > If you don't have your own legitimate registered-system credentials, **leave these env vars unset**. The MCP will throw a clear, actionable error on every restricted tool ("requires X-System + X-System-Key …") rather than silently bypassing the gate. The unrestricted 130+ tools all work fine on a regular FUB API key.
 >
@@ -128,6 +128,18 @@ npm install
    ```bash
    npm install
    ```
+
+**Docker (on a server you run yourself):**
+
+```bash
+docker run -d --name fub-mcp -p 127.0.0.1:3000:3000 \
+  -e FUB_API_KEY=your_api_key_here \
+  -e MCP_AUTH_PASSWORD=a-password-of-12-or-more-characters \
+  -v fub-mcp-data:/data \
+  ghcr.io/mindwear-capitian/followupboss-mcp-server:2
+```
+
+The server listens at `http://localhost:3000/mcp` and asks for that password when an MCP tool connects. Claude on the web and phone need HTTPS, so for those use the [Hostinger install](deploy/hostinger/README.md). With Docker you can skip Step 3.
 
 ### Step 3: Run Setup
 
@@ -764,7 +776,7 @@ Your API key stays on your computer, or on your own server if you use the Hostin
 
 **Does this cost anything?**
 
-This server is free and open source. You just need a Follow Up Boss account with API access (included in most paid plans).
+This server is free to self-host, and its code is public under the Elastic License 2.0 (source-available). You just need a Follow Up Boss account with API access (included in most paid plans).
 
 **Can Claude modify my FUB data?**
 

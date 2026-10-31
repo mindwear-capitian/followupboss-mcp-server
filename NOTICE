@@ -39,6 +39,10 @@ Contributors
   joefeser          Safe Mode inbox-deactivate fix, MCP error semantics,
                     duplicate-email detection, dependency security updates (v1.5.3)
 
+  tony-dot-sh       listNotes tool, list casing fixes, deal field expansion (v1.2.0)
+
+  drew778           Security reports: Safe Mode default, read-only check (v1.4.0)
+
 ================================================================================
 
 Trademarks

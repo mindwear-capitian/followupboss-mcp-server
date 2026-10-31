@@ -23,7 +23,7 @@ The long version, because it matters and I'd rather be clear than clever:
 >
 > Your contribution is also published to the public under the Elastic License 2.0, same as the rest of the repo.
 
-Why this exists: the repo is ELv2, which stops *anyone* from offering it as a hosted or managed service. Without a separate grant, that same restriction would ride along on contributed code — so a handful of donated lines could block the project's own maintainer from running a hosted version. This paragraph fixes that. Nothing changes for you as a user or a self-hoster: self-hosting is free and always will be.
+Why this exists: the repo is ELv2, which stops *anyone* from offering it as a hosted or managed service. Without a separate grant, that same restriction would ride along on contributed code — this grant keeps the project's license options open. Nothing changes for you as a user or a self-hoster: self-hosting is free and always will be.
 
 ## Reporting bugs
 

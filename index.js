@@ -23,7 +23,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import axios from 'axios';
 import express from 'express';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, realpathSync } from 'fs';
 import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -305,7 +305,7 @@ function handleApiError(error) {
 }
 
 // ---------------------------------------------------------------------------
-// Tool Definitions (160 tools — 152 core + 5 convenience + 2 meta)
+// Tool Definitions (160 tools — 153 core + 5 convenience + 2 meta)
 // ---------------------------------------------------------------------------
 
 export const TOOL_DEFINITIONS = [
@@ -4110,7 +4110,7 @@ export const TOOL_DEFINITIONS = [
       },
       "stageId": {
         "type": "number",
-        "description": "Filter by stage ID (from listStages). Works live although the docs omit it."
+        "description": "Filter by stage ID (from listStages). Not in the FUB docs; confirmed against a live account."
       },
       "id": {
         "type": "string",
@@ -5785,7 +5785,9 @@ export async function handleToolCall(name, rawArgs) {
         contributors: {
           'yoship90': 'Smart list API key fix (v1.1.2)',
           'chad778': 'OAuth + remote transport prototype (in fork chad778/followupboss-mcp-server)',
-          'joefeser': 'Safe Mode, MCP error, and duplicate-email fixes; dependency security updates (v1.5.3)'
+          'joefeser': 'Safe Mode, MCP error, and duplicate-email fixes; dependency security updates (v1.5.3)',
+          'tony-dot-sh': 'listNotes, list casing fixes, deal field expansion (v1.2.0)',
+          'drew778': 'Safe Mode default and read-only check security reports (v1.4.0)'
         },
         license: 'Elastic License 2.0 — see LICENSE file. Self-host free; commercial hosting/resale requires separate agreement.',
         github: 'https://github.com/mindwear-capitian/followupboss-mcp-server'
@@ -6687,8 +6689,6 @@ export async function handleToolCall(name, rawArgs) {
 // MCP Server Setup
 // ---------------------------------------------------------------------------
 
-// Single source of truth for "is this a destructive delete tool?" — used both to
-// filter the advertised tool surface and to enforce Safe Mode at dispatch time.
 // Server instructions: sent once at connect. Tells the AI the one-call answer to common questions.
 export const DEFAULT_INSTRUCTIONS = `Follow Up Boss CRM tools. Answer common questions in ONE call:
 - New leads: listPeople stage="Lead" (newest created first by default). For "today" or "this week", read each person's created date and stop at the first one older than the start date.
@@ -6703,6 +6703,8 @@ Rules:
 - Lists return 10 rows unless limit is set (max 100). If _metadata.next is set, call again with next=<value>.
 - Pass fields=id,name,stage,created,... to keep responses small.`;
 
+// Single source of truth for "is this a destructive delete tool?" — used both to
+// filter the advertised tool surface and to enforce Safe Mode at dispatch time.
 export function isDeleteTool(name) {
   const n = String(name).toLowerCase();
   return n.startsWith('delete')
@@ -7310,8 +7312,11 @@ async function main() {
 // Only auto-run if invoked directly (not when imported as a module).
 // Allows other projects to `import { createServer, startHttp } from
 // 'followupboss-mcp-server'` and call them with custom overlays.
+// realpathSync follows the npm bin symlink, so `followupboss-mcp-server` starts too.
 const __filename = fileURLToPath(import.meta.url);
-if (process.argv[1] === __filename) {
+let invokedPath = '';
+try { invokedPath = process.argv[1] ? realpathSync(process.argv[1]) : ''; } catch { invokedPath = process.argv[1] || ''; }
+if (invokedPath === __filename) {
   main().catch((e) => {
     console.error('Fatal:', e);
     process.exit(1);

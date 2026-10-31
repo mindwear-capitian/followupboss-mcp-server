@@ -50,7 +50,7 @@ async function main() {
   console.log('This will set up your connection to Follow Up Boss.');
   console.log('You\'ll need your FUB API key.');
   console.log('');
-  console.log('To find it: Log into FUB > Admin > API > copy your API key');
+  console.log('To find it: Log into FUB > Admin > Integrations > API Keys & Lead Email > Create API Key');
   console.log('');
 
   const apiKey = await ask('Enter your FUB API key: ');
@@ -76,7 +76,7 @@ async function main() {
   } catch (error) {
     if (error.response?.status === 401) {
       console.log('\nInvalid API key. Please check your key and try again.');
-      console.log('Find it at: FUB > Admin > API');
+      console.log('Find it at: FUB > Admin > Integrations > API Keys & Lead Email');
     } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
       console.log('\nCould not connect to Follow Up Boss. Check your internet connection.');
     } else {
@@ -163,7 +163,7 @@ function printNextSteps(safeMode) {
   console.log('');
   console.log('OPTION 2: Claude Code');
   console.log('');
-  console.log(`  claude mcp add followupboss node ${fullPath}/index.js`);
+  console.log(`  claude mcp add followupboss -- node ${fullPath}/index.js`);
   console.log('');
   console.log('Then restart Claude and try asking:');
   console.log('  "Show me my recent leads in Follow Up Boss"');

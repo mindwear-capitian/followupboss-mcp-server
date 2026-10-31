@@ -2,7 +2,7 @@
 
 ## Scope
 
-This server provides full read/write/delete access to a Follow Up Boss CRM account using the user's own API key. It runs locally on the user's machine (or self-hosted server) and never sends data to anywhere except `api.followupboss.com`. There is no central service, no telemetry, no analytics.
+This server provides read and write access to a Follow Up Boss CRM account (and delete access if the user turns off Safe Mode) using the user's own API key. It runs locally on the user's machine (or self-hosted server) and sends your CRM data only to `api.followupboss.com` and to the AI tool you connect it to. There is no central service, no telemetry, no analytics.
 
 That said, anything that runs against a real CRM with real client data is worth taking seriously. If you find a security issue, please report it.
 

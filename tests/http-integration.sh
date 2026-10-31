@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bet-your-life HTTP integration tests.
+# End-to-end HTTP integration tests.
 # Tests both bearer auth and full OAuth 2.1 flow against real FUB account.
 # Only READ-ONLY operations + one notes create+delete roundtrip.
 # The transport is stateless (v2.0.0): no Mcp-Session-Id is ever minted.
@@ -54,7 +54,7 @@ INIT_RESP=$(curl -s -X POST "$BASE/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -D /tmp/init-headers.txt \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"bet-your-life","version":"1"}}}')
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"http-integration-test","version":"1"}}}')
 SESSION=$(grep -i "mcp-session-id" /tmp/init-headers.txt | head -1 | awk '{print $2}' | tr -d '\r')
 if echo "$INIT_RESP" | grep -q '"serverInfo"'; then
   ok "initialize returned serverInfo (session: ${SESSION:0:8}...)"
@@ -205,7 +205,7 @@ fi
 # 2.2 DCR: register a client
 REG_RESP=$(curl -s -X POST "$BASE/oauth/register" \
   -H "Content-Type: application/json" \
-  -d '{"redirect_uris":["http://localhost:9999/callback"],"client_name":"bet-your-life-test"}')
+  -d '{"redirect_uris":["http://localhost:9999/callback"],"client_name":"http-integration-test"}')
 CLIENT_ID=$(echo "$REG_RESP" | grep -oE '"client_id":"[a-f0-9]+"' | head -1 | sed 's/.*:"//;s/"$//')
 if [ -n "$CLIENT_ID" ]; then
   ok "DCR registered client_id=${CLIENT_ID:0:8}..."

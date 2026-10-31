@@ -50,10 +50,15 @@ jobs:
       - name: Import / overlay contract
         run: node tests/import-overlay.mjs
 
+      - name: Tool fixes
+        run: node tests/tool-fixes.mjs
+
+      - name: Both MCP protocol versions over HTTP
+        run: node tests/http-eras.mjs
+
       - name: Tool count is stable
         # Guards the numbers published in README.md, package.json and the
-        # GitHub repo description. These drifted apart once already (159 /
-        # 160 / 134 all live at the same time); this makes them self-checking.
+        # GitHub repo description, so they stay in step.
         #   TOOL_DEFINITIONS = every tool that exists
         #   activeTools      = what is advertised with Safe Mode on (deletes hidden)
         run: |
