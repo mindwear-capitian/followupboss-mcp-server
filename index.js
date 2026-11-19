@@ -6034,7 +6034,7 @@ export async function handleToolCall(name, rawArgs) {
     case 'listAutomations': {
       requireSystemCreds('listAutomations');
       const response = await fubApi.get('/automations', { params: args });
-      return { automations: response.data.automations, _metadata: response.data._metadata };
+      return { automations: response.data.automationsnew || response.data.automations, _metadata: response.data._metadata };
     }
     case 'getAutomation': {
       requireSystemCreds('getAutomation');
