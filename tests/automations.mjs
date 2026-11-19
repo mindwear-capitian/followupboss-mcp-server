@@ -19,4 +19,11 @@ assert.deepStrictEqual(r._metadata, meta);
 body = { _metadata: meta, automations: [{ id: 3 }] };
 r = await m.handleToolCall('listAutomations', {});
 assert.deepStrictEqual(r.automations, [{ id: 3 }], 'still reads legacy automations key');
+// People lists already match FUB's keys; guard them against regression.
+body = { _metadata: {}, automationsPeople: [{ id: 4 }] };
+r = await m.handleToolCall('listAutomationsPeople', {});
+assert.deepStrictEqual(r.automationsPeople, [{ id: 4 }], 'listAutomationsPeople rows');
+body = { _metadata: {}, actionPlansPeople: [{ id: 5 }] };
+r = await m.handleToolCall('listActionPlansPeople', {});
+assert.deepStrictEqual(r.actionPlansPeople, [{ id: 5 }], 'listActionPlansPeople rows');
 console.log('automations: all checks passed');
